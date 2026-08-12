@@ -1,6 +1,13 @@
+using WorkTimeTracker.Models;
+
 namespace WorkTimeTracker.Services;
 
 public interface ISessionService
 {
+    public void CreateSesssion(WorkSession session);
+    public void UpdateSession(int id, WorkSession session);
+    public void DeleteSession(int id);
+    public List<WorkSession> GetSessions(DateOnly startDate, DateOnly endDate);
+    public decimal GetTotalHours(DateOnly startDate, DateOnly endDate);
     
 }
