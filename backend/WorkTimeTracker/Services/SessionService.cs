@@ -16,21 +16,24 @@ public class SessionService : ISessionService
         
         _context.WorkSession.Add(session);
         _context.SaveChanges();
+        
     }
 
     public void UpdateSession(int id, WorkSession session)
     {
-        
+        _context.WorkSession.Update(_context.WorkSession.Find(id));
+        _context.SaveChanges();
     }
     
     public void DeleteSession(int id)
     {
-
+        _context.WorkSession.Remove(_context.WorkSession.Find(id));
+        _context.SaveChanges();
     }
 
     public List<WorkSession> GetSessions(DateOnly startDate, DateOnly endDate)
     {
-       
+        
         return List<WorkSession>
     }
 
