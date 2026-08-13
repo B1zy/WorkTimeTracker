@@ -4,6 +4,13 @@ namespace WorkTimeTracker.Services;
 
 public class SessionService : ISessionService
 {
+    private readonly WorkSessionContext _context;
+    
+    public SessionService(WorkSessionContext context)
+    {
+        _context = context;
+    }
+
     public void CreateSession(WorkSession session)
     {
         
@@ -21,7 +28,8 @@ public class SessionService : ISessionService
 
     public List<WorkSession> GetSessions(DateOnly startDate, DateOnly endDate)
     {
-        return 
+       
+        return List<WorkSession>
     }
 
     public decimal GetTotalHours(DateOnly startDate, DateOnly endDate)
