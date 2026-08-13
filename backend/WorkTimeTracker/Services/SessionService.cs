@@ -14,6 +14,8 @@ public class SessionService : ISessionService
     public void CreateSession(WorkSession session)
     {
         
+        _context.WorkSession.Add(session);
+        _context.SaveChanges();
     }
 
     public void UpdateSession(int id, WorkSession session)
