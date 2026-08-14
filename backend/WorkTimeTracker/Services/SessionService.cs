@@ -1,4 +1,3 @@
-using Microsoft.CodeAnalysis;
 using WorkTimeTracker.Models;
 
 namespace WorkTimeTracker.Services;
@@ -12,9 +11,22 @@ public class SessionService : ISessionService
         _context = context;
     }
 
+    public List<WorkSession> GetAllSessions()
+    {
+        return _context.WorkSession.ToList();
+    }
+
+    public WorkSession? GetSessionById(int id)
+    {
+        return _context.WorkSession.Find(id);
+    }
+
     public void CreateSession(WorkSession session)
     {
-        
+        if (session.End <= session.Start)
+        {
+            throw new ArgumentException("End time must be after start time.");
+        }
         _context.WorkSession.Add(session);
         _context.SaveChanges();
         
@@ -22,7 +34,16 @@ public class SessionService : ISessionService
 
     public void UpdateSession(int id, WorkSession session)
     {
+        if (session.End <= session.Start)
+        {
+            throw new ArgumentException("End time must be after start time.");
+        }
         var existing = _context.WorkSession.Find(id);
+        if (existing is null)
+        {
+            throw new KeyNotFoundException($"Work session {id} not found.");
+        }
+
         existing.Name = session.Name;
         existing.Description = session.Description;
         existing.Location = session.Location;
@@ -36,16 +57,20 @@ public class SessionService : ISessionService
     public void DeleteSession(int id)
     {
         var session = _context.WorkSession.Find(id);
+        if (session is null)
+        {
+            throw new KeyNotFoundException($"Work session {id} not found.");
+        }
+
         _context.WorkSession.Remove(session);
         _context.SaveChanges();
     }
 
     public List<WorkSession> GetSessions(DateOnly startDate, DateOnly endDate)
     {
-        _context.WorkSession
+        return _context.WorkSession
             .Where(s => s.Date >= startDate && s.Date <= endDate)
             .ToList();
-        return _context.WorkSession.ToList();
     }
 
     public decimal GetTotalHours(DateOnly startDate, DateOnly endDate)

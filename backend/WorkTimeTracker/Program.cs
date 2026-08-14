@@ -1,5 +1,6 @@
 using System.Text.Json.Serialization;
 using WorkTimeTracker.Models;
+using WorkTimeTracker.Services;
 using Microsoft.EntityFrameworkCore;
 var builder = WebApplication.CreateBuilder(args);
 
@@ -14,6 +15,7 @@ builder.Services.AddControllers()
 builder.Services.AddOpenApi();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddDbContext<WorkSessionContext>(opt => opt.UseSqlite("Data Source=worksession.db"));
+builder.Services.AddScoped<ISessionService, SessionService>();
 var app = builder.Build();
 
 
