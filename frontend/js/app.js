@@ -7,22 +7,23 @@ import {
   addDays,
   toISODate,
   formatWeekRangeLabel,
-  durationHours,
-  formatHours,
+  durationMinutes,
+  formatDuration,
 } from "./dateUtils.js";
 import { renderWeek } from "./timeline.js";
 import { openCreateModal, openEditModal } from "./modal.js";
 
-const WEEK_TARGET_HOURS = 42.4;
-// Scale for the progress bar track. Comfortably above target so a slightly
-// "over" week still shows headroom in the fill instead of just maxing out.
-const SUMMARY_BAR_MAX_HOURS = 55;
+// 42.4h happens to be exactly 2544 minutes (42h 24m) -- no rounding involved.
+const WEEK_TARGET_MINUTES = 42.4 * 60;
+// Scale for the gauge meter. Comfortably above target so a slightly "over"
+// week still shows headroom in the fill instead of just maxing out.
+const SUMMARY_METER_MAX_MINUTES = 55 * 60;
 
 const weekRangeLabel = document.getElementById("week-range-label");
 const prevWeekBtn = document.getElementById("prev-week-btn");
 const nextWeekBtn = document.getElementById("next-week-btn");
 const totalHoursEl = document.getElementById("week-total-hours");
-const statusPill = document.getElementById("week-status-pill");
+const statusIndicator = document.getElementById("week-status-pill");
 const barFill = document.getElementById("summary-bar-fill");
 const barTargetMarker = document.getElementById("summary-bar-target-marker");
 const weekRowsEl = document.getElementById("week-rows");
@@ -40,33 +41,37 @@ function clearError() {
   errorMessageEl.hidden = true;
 }
 
-function renderSummary(totalHours) {
-  totalHoursEl.textContent = formatHours(totalHours);
+function renderSummary(totalMinutes) {
+  totalHoursEl.textContent = formatDuration(totalMinutes);
 
-  const diff = totalHours - WEEK_TARGET_HOURS;
+  const diff = totalMinutes - WEEK_TARGET_MINUTES;
   let state;
   let label;
-  if (Math.abs(diff) < 0.05) {
+  if (Math.abs(diff) < 3) {
+    // Within 3 minutes counts as "on target" -- avoids the lamp flickering
+    // between states over rounding noise.
     state = "target";
     label = "On Target";
   } else if (diff < 0) {
     state = "under";
-    label = `${formatHours(Math.abs(diff))} Under`;
+    label = `${formatDuration(Math.abs(diff))} Under`;
   } else {
     state = "over";
-    label = `${formatHours(diff)} Over`;
+    label = `${formatDuration(diff)} Over`;
   }
 
-  statusPill.textContent = label;
-  statusPill.className = `status-pill status-${state}`;
+  // Built from formatDuration()'s numeric output plus a fixed suffix, so
+  // there's no user-supplied text here -- safe to set as markup.
+  statusIndicator.innerHTML = `<span class="status-lamp"></span><span class="status-label">${label}</span>`;
+  statusIndicator.className = `status-indicator status-${state}`;
   barFill.className = `summary-bar-fill state-${state}`;
-  barFill.style.width = `${Math.min((totalHours / SUMMARY_BAR_MAX_HOURS) * 100, 100)}%`;
+  barFill.style.width = `${Math.min((totalMinutes / SUMMARY_METER_MAX_MINUTES) * 100, 100)}%`;
 }
 
-// Positions the fixed target tick mark on the progress bar. The target and
-// scale never change, so this only needs to run once at startup.
+// Positions the fixed target needle on the gauge meter. The target and scale
+// never change, so this only needs to run once at startup.
 function positionTargetMarker() {
-  barTargetMarker.style.left = `${(WEEK_TARGET_HOURS / SUMMARY_BAR_MAX_HOURS) * 100}%`;
+  barTargetMarker.style.left = `${(WEEK_TARGET_MINUTES / SUMMARY_METER_MAX_MINUTES) * 100}%`;
 }
 
 async function loadWeek() {
@@ -84,9 +89,9 @@ async function loadWeek() {
     }
 
     const weekDays = [0, 1, 2, 3, 4].map((n) => addDays(currentMonday, n));
-    const totalHours = sessions.reduce((sum, s) => sum + durationHours(s.start, s.end), 0);
+    const totalMinutes = sessions.reduce((sum, s) => sum + durationMinutes(s.start, s.end), 0);
 
-    renderSummary(totalHours);
+    renderSummary(totalMinutes);
     renderWeek(weekRowsEl, weekDays, sessionsByDate, {
       onAddClick: handleAddClick,
       onSessionClick: handleSessionClick,

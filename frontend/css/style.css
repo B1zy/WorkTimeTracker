@@ -1,33 +1,37 @@
 :root {
-  /* Surfaces -- deep ink navy, not neutral grey */
-  --bg: #0B0F1A;
-  --surface: #131826;
-  --surface-raised: #1B2233;
-  --border: #262E42;
-  --border-strong: #3A4360;
+  /* "Shop-Floor Time Clock" -- warm graphite, not cool navy */
+  --bg: #15120F;
+  --surface: #1F1912;
+  --surface-raised: #2A2118;
+  --border: #4A3D2C;
+  --border-strong: #6B5B42;
 
   /* Text */
-  --text-primary: #F5F7FA;
-  --text-secondary: #8B93A8;
-  --text-dim: #5B6478;
-  --text-on-accent: #0B0F1A;
+  --text-primary: #F5EFE2;
+  --text-secondary: #B3A488;
+  --text-dim: #7C7058;
+  --text-on-accent: #15120F;
 
-  /* Location colors (timeline blocks) -- cool family */
-  --loc-remote: #29D6E8;
-  --loc-inoffice: #B44BFF;
-  --loc-other: #E8ECF5;
+  /* Location colors (timeline blocks) -- indicator-lamp family, kept
+     separate from the state colors below so the two systems never collide */
+  --loc-remote: #2C8CFF;
+  --loc-inoffice: #C13CFF;
+  --loc-other: #D8CDB8;
 
-  /* Target-state colors (week summary only) -- warm traffic-light family,
-     kept separate from the location hues so the two systems never collide */
-  --state-under: #FFB020;
-  --state-target: #22FF88;
-  --state-over: #FF3B5C;
+  /* Target-state colors (week summary only) */
+  --state-under: #FFB000;
+  --state-target: #3DFF8A;
+  --state-over: #FF1E39;
 
-  --radius: 8px;
-  --radius-lg: 12px;
+  /* Primary accent -- signal orange, the one real risk in this palette */
+  --accent: #FF5A1F;
 
+  --radius: 4px;
+  --radius-lg: 8px;
+
+  --font-display: "Bahnschrift", "Arial Narrow", sans-serif;
   --font-sans: system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
-  --font-mono: ui-monospace, "Cascadia Mono", "SF Mono", "Segoe UI Mono", Consolas, monospace;
+  --font-mono: "Cascadia Mono", Consolas, ui-monospace, "SF Mono", monospace;
 }
 
 * {
@@ -72,7 +76,7 @@ body {
 .nav-btn {
   width: 32px;
   height: 32px;
-  border-radius: 6px;
+  border-radius: var(--radius);
   border: 1px solid var(--border-strong);
   background: var(--surface-raised);
   color: var(--text-primary);
@@ -84,13 +88,15 @@ body {
   justify-content: center;
 }
 .nav-btn:hover {
-  background: var(--border-strong);
+  border-color: var(--accent);
+  color: var(--accent);
 }
 
 .week-range-label {
+  font-family: var(--font-display);
   font-weight: 700;
-  font-size: 1rem;
-  letter-spacing: 0.01em;
+  font-size: 1.05rem;
+  letter-spacing: 0.02em;
   white-space: nowrap;
   min-width: 150px;
   text-align: center;
@@ -101,7 +107,7 @@ body {
   align-items: center;
   gap: 20px;
   flex: 1;
-  min-width: 280px;
+  min-width: 300px;
 }
 
 .summary-hours {
@@ -113,75 +119,112 @@ body {
 
 .summary-total {
   font-family: var(--font-mono);
-  font-size: 2.2rem;
+  font-size: 2.1rem;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
   line-height: 1;
+  text-shadow: 0 0 10px rgba(255, 90, 31, 0.25);
 }
 
 .summary-target {
-  font-size: 0.85rem;
+  font-family: var(--font-display);
+  font-size: 0.8rem;
+  font-weight: 700;
   color: var(--text-secondary);
+  letter-spacing: 0.02em;
   white-space: nowrap;
 }
 
-.status-pill {
+/* Console-lamp status indicator: a glowing dot + colored label, standing in
+   for a rounded SaaS badge -- like a lamp on a control panel. */
+.status-indicator {
   flex-shrink: 0;
-  padding: 6px 12px;
-  border-radius: 999px;
-  font-size: 0.75rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: var(--text-on-accent);
-  background: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  gap: 8px;
   white-space: nowrap;
 }
-.status-pill.status-under {
-  background: var(--state-under);
+.status-lamp {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--text-secondary);
 }
-.status-pill.status-target {
-  background: var(--state-target);
+.status-label {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-secondary);
 }
-.status-pill.status-over {
-  background: var(--state-over);
+.status-indicator.status-under .status-lamp { background: var(--state-under); box-shadow: 0 0 8px var(--state-under); }
+.status-indicator.status-under .status-label { color: var(--state-under); }
+.status-indicator.status-target .status-lamp { background: var(--state-target); box-shadow: 0 0 8px var(--state-target); }
+.status-indicator.status-target .status-label { color: var(--state-target); }
+.status-indicator.status-over .status-lamp { background: var(--state-over); box-shadow: 0 0 10px var(--state-over); animation: lamp-pulse 1.4s ease-in-out infinite; }
+.status-indicator.status-over .status-label { color: var(--state-over); }
+
+@keyframes lamp-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+/* Gauge meter: a tick-marked scale with a triangular needle at the target,
+   standing in for a plain progress bar. */
+.summary-meter {
+  position: relative;
+  flex: 1;
+  min-width: 140px;
 }
 
 .summary-bar-track {
   position: relative;
-  flex: 1;
   height: 14px;
-  min-width: 140px;
-  background: var(--surface-raised);
+  background-color: var(--surface-raised);
   border: 1px solid var(--border);
-  border-radius: 999px;
+  border-radius: var(--radius);
   overflow: hidden;
+  /* Tick marks every 5h across the 0-55h scale (11 segments) */
+  background-image: repeating-linear-gradient(
+    to right,
+    var(--border-strong) 0,
+    var(--border-strong) 1px,
+    transparent 1px,
+    transparent calc(100% / 11)
+  );
 }
 
 .summary-bar-fill {
   position: absolute;
   inset: 0 auto 0 0;
   width: 0%;
-  border-radius: 999px;
   transition: width 0.3s ease;
 }
-.summary-bar-fill.state-under {
-  background: var(--state-under);
-}
-.summary-bar-fill.state-target {
-  background: var(--state-target);
-}
-.summary-bar-fill.state-over {
-  background: var(--state-over);
-}
+.summary-bar-fill.state-under { background: var(--state-under); }
+.summary-bar-fill.state-target { background: var(--state-target); }
+.summary-bar-fill.state-over { background: var(--state-over); }
 
+/* Positioned as a sibling of (not inside) .summary-bar-track so its needle
+   can extend above the track without being clipped by the track's
+   overflow:hidden (which exists to clip the fill's corners). */
 .summary-bar-target-marker {
   position: absolute;
-  top: -2px;
+  top: -7px;
   bottom: -2px;
   width: 2px;
   background: var(--text-primary);
-  opacity: 0.6;
+  opacity: 0.85;
+}
+.summary-bar-target-marker::after {
+  content: "";
+  position: absolute;
+  top: -6px;
+  left: 50%;
+  transform: translateX(-50%);
+  border-left: 5px solid transparent;
+  border-right: 5px solid transparent;
+  border-top: 6px solid var(--text-primary);
 }
 
 /* --- Day rows --- */
@@ -189,12 +232,13 @@ body {
 .week-rows {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 12px;
 }
 
 .day-row {
+  position: relative;
   display: grid;
-  grid-template-columns: 120px 1fr 100px;
+  grid-template-columns: 120px 1fr 108px;
   align-items: center;
   gap: 16px;
   background: var(--surface);
@@ -203,12 +247,30 @@ body {
   padding: 12px 18px;
 }
 
+/* Punch-notches on the left edge, like a ticket stub torn from a card. */
+.day-row::before,
+.day-row::after {
+  content: "";
+  position: absolute;
+  left: -7px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--bg);
+  border: 1px solid var(--border);
+}
+.day-row::before { top: 10px; }
+.day-row::after { bottom: 10px; }
+
 .day-row-header .weekday {
+  font-family: var(--font-display);
   font-weight: 700;
-  font-size: 0.9rem;
-  letter-spacing: 0.06em;
+  font-size: 0.95rem;
+  letter-spacing: 0.08em;
+  color: var(--text-primary);
 }
 .day-row-header .date {
+  font-family: var(--font-mono);
   font-size: 0.8rem;
   color: var(--text-secondary);
   margin-top: 2px;
@@ -218,38 +280,52 @@ body {
   min-width: 0;
 }
 
+/* Ruler-style axis: major ticks (labeled, every 6h) are taller and brighter
+   than the minor ticks (every 3h), like a physical measuring instrument. */
 .timeline-axis {
   position: relative;
-  height: 14px;
+  height: 16px;
   margin-bottom: 4px;
-  font-family: var(--font-mono);
-  font-size: 0.65rem;
-  color: var(--text-dim);
 }
-.timeline-axis span {
+.axis-tick {
   position: absolute;
+  bottom: 0;
+  width: 1px;
+}
+.axis-tick-minor {
+  height: 5px;
+  background: var(--border-strong);
+}
+.axis-tick-major {
+  height: 9px;
+  background: var(--text-dim);
+}
+.axis-tick-label {
+  position: absolute;
+  top: -13px;
+  left: 50%;
   transform: translateX(-50%);
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  color: var(--text-dim);
+  white-space: nowrap;
 }
-.timeline-axis span:first-child {
-  transform: translateX(0);
-}
-.timeline-axis span:last-child {
-  transform: translateX(-100%);
-}
+.axis-tick-label-start { transform: translateX(0); }
+.axis-tick-label-end { transform: translateX(-100%); }
 
 .timeline-track {
   position: relative;
   height: 44px;
-  border-radius: 6px;
+  border-radius: var(--radius);
   border: 1px solid var(--border);
   background-color: var(--surface-raised);
-  /* Evenly spaced hour gridlines across the fixed 06:00-20:00 (14 hour) range */
+  /* Hour gridlines across the full 24h range */
   background-image: repeating-linear-gradient(
     to right,
     var(--border) 0,
     var(--border) 1px,
     transparent 1px,
-    transparent calc(100% / 14)
+    transparent calc(100% / 24)
   );
 }
 
@@ -258,7 +334,7 @@ body {
   top: 5px;
   bottom: 5px;
   border: none;
-  border-radius: 4px;
+  border-radius: 3px;
   padding: 0 8px;
   font-family: var(--font-sans);
   font-size: 0.72rem;
@@ -275,12 +351,8 @@ body {
   filter: brightness(1.12);
   transform: translateY(-1px);
 }
-.timeline-block.loc-remote {
-  background: var(--loc-remote);
-}
-.timeline-block.loc-inoffice {
-  background: var(--loc-inoffice);
-}
+.timeline-block.loc-remote { background: var(--loc-remote); }
+.timeline-block.loc-inoffice { background: var(--loc-inoffice); }
 .timeline-block.loc-other {
   background: var(--loc-other);
   border: 1px dashed var(--text-dim);
@@ -292,24 +364,39 @@ body {
   align-items: flex-end;
   gap: 6px;
 }
+
+/* Recessed LED-readout look for the day total */
 .day-total {
   font-family: var(--font-mono);
   font-weight: 700;
-  font-size: 1.1rem;
+  font-size: 1rem;
   font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+  color: var(--text-primary);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 4px 10px;
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.5);
+  text-shadow: 0 0 6px rgba(245, 239, 226, 0.3);
 }
+
 .add-btn {
   padding: 5px 10px;
-  font-size: 0.78rem;
-  font-weight: 600;
-  border-radius: 6px;
-  border: 1px solid var(--border-strong);
-  background: var(--surface-raised);
-  color: var(--text-primary);
+  font-family: var(--font-display);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  border-radius: var(--radius);
+  border: 1px solid var(--accent);
+  background: transparent;
+  color: var(--accent);
   cursor: pointer;
 }
 .add-btn:hover {
-  background: var(--border-strong);
+  background: var(--accent);
+  color: var(--text-on-accent);
 }
 
 /* --- Modal --- */
@@ -323,12 +410,14 @@ body {
   width: min(420px, 90vw);
 }
 .session-dialog::backdrop {
-  background: rgba(11, 15, 26, 0.75);
+  background: rgba(21, 18, 15, 0.8);
 }
 
 #dialog-title {
+  font-family: var(--font-display);
   margin: 0 0 4px;
-  font-size: 1.15rem;
+  font-size: 1.2rem;
+  letter-spacing: 0.01em;
 }
 .dialog-date-label {
   margin: 0 0 18px;
@@ -342,8 +431,11 @@ body {
   margin-bottom: 12px;
 }
 .form-row label {
-  font-size: 0.8rem;
-  font-weight: 600;
+  font-family: var(--font-display);
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
   color: var(--text-secondary);
   margin-bottom: 4px;
 }
@@ -361,15 +453,19 @@ input,
 select {
   background: var(--surface-raised);
   border: 1px solid var(--border-strong);
-  border-radius: 6px;
+  border-radius: var(--radius);
   color: var(--text-primary);
   padding: 8px;
   font-size: 0.95rem;
   font-family: var(--font-sans);
 }
+#start-input,
+#end-input {
+  font-family: var(--font-mono);
+}
 input:focus,
 select:focus {
-  outline: 2px solid var(--loc-remote);
+  outline: 2px solid var(--accent);
   outline-offset: 1px;
 }
 
@@ -388,14 +484,17 @@ select:focus {
 .btn-secondary,
 .btn-delete {
   padding: 8px 16px;
-  font-size: 0.9rem;
-  font-weight: 600;
-  border-radius: 6px;
+  font-family: var(--font-display);
+  font-size: 0.85rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  border-radius: var(--radius);
   cursor: pointer;
 }
 .btn-primary {
   border: none;
-  background: var(--loc-remote);
+  background: var(--accent);
   color: var(--text-on-accent);
 }
 .btn-primary:hover {
@@ -423,9 +522,9 @@ select:focus {
 
 .error {
   color: var(--state-over);
-  background: rgba(255, 59, 92, 0.12);
+  background: rgba(255, 30, 57, 0.12);
   border: 1px solid var(--state-over);
-  border-radius: 6px;
+  border-radius: var(--radius);
   padding: 10px 14px;
   margin-bottom: 16px;
   font-size: 0.85rem;

@@ -51,13 +51,21 @@ export function timeStringToMinutes(timeStr) {
   return hours * 60 + minutes;
 }
 
-export function durationHours(start, end) {
-  return (timeStringToMinutes(end) - timeStringToMinutes(start)) / 60;
+export function durationMinutes(start, end) {
+  return timeStringToMinutes(end) - timeStringToMinutes(start);
 }
 
-// Trims trailing zeros: 3 -> "3h", 3.5 -> "3.5h"
-export function formatHours(hours) {
-  return `${parseFloat(hours.toFixed(2))}h`;
+// Minutes -> "6h 42m". Drops whichever unit is zero so exact hours read as
+// "6h" instead of "6h 0m", and sub-hour durations read as "42m" alone.
+export function formatDuration(totalMinutes) {
+  const sign = totalMinutes < 0 ? "-" : "";
+  const abs = Math.round(Math.abs(totalMinutes));
+  const hours = Math.floor(abs / 60);
+  const minutes = abs % 60;
+
+  if (hours === 0) return `${sign}${minutes}m`;
+  if (minutes === 0) return `${sign}${hours}h`;
+  return `${sign}${hours}h ${minutes}m`;
 }
 
 // "09:30:00" -> "9:30"

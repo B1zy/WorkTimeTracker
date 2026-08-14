@@ -1,24 +1,25 @@
-// Renders the five day-rows: for each day, an hour axis + a track of
-// absolutely-positioned session blocks + a total/add-button column.
+// Renders the five day-rows: for each day, a ruler-style hour axis + a track
+// of absolutely-positioned session blocks + an LED-style total/add-button column.
 
 import {
   timeStringToMinutes,
-  durationHours,
-  formatHours,
+  durationMinutes,
+  formatDuration,
   formatTimeShort,
   formatWeekdayShort,
   formatDayShort,
   toISODate,
 } from "./dateUtils.js";
 
-// The visible timeline spans 06:00-20:00 (14 hours). Sessions outside this
-// range get clamped so they can't stretch the row layout.
-const DAY_START_MIN = 6 * 60;
-const DAY_END_MIN = 20 * 60;
+// The timeline always spans the full day so a session late at night can
+// never render outside the row.
+const DAY_START_MIN = 0;
+const DAY_END_MIN = 24 * 60;
 const DAY_RANGE_MIN = DAY_END_MIN - DAY_START_MIN;
 
-// Axis tick labels, shown every 2 hours to keep the row from getting noisy.
-const AXIS_HOURS = [6, 8, 10, 12, 14, 16, 18, 20];
+// Ruler ticks: major (labeled) every 6h, minor (unlabeled) every 3h in between.
+const MAJOR_HOURS = [0, 6, 12, 18, 24];
+const MINOR_HOURS = [3, 9, 15, 21];
 
 const LOCATION_CLASS = {
   Remote: "loc-remote",
@@ -33,7 +34,7 @@ const LOCATION_LABEL = {
 };
 
 // Minutes-since-midnight -> left-offset percentage along the timeline,
-// clamped to [0, 100] so an out-of-range session can't overflow the row.
+// clamped to [0, 100] as a safety net (the range already covers the full day).
 function minutesToPercent(minutes) {
   const clamped = Math.min(Math.max(minutes, DAY_START_MIN), DAY_END_MIN);
   return ((clamped - DAY_START_MIN) / DAY_RANGE_MIN) * 100;
@@ -42,12 +43,31 @@ function minutesToPercent(minutes) {
 function buildAxis() {
   const axis = document.createElement("div");
   axis.className = "timeline-axis";
-  for (const hour of AXIS_HOURS) {
-    const label = document.createElement("span");
-    label.textContent = `${String(hour).padStart(2, "0")}:00`;
-    label.style.left = `${minutesToPercent(hour * 60)}%`;
-    axis.append(label);
+
+  for (const hour of MINOR_HOURS) {
+    const tick = document.createElement("span");
+    tick.className = "axis-tick axis-tick-minor";
+    tick.style.left = `${minutesToPercent(hour * 60)}%`;
+    axis.append(tick);
   }
+
+  for (const hour of MAJOR_HOURS) {
+    const tick = document.createElement("span");
+    tick.className = "axis-tick axis-tick-major";
+    tick.style.left = `${minutesToPercent(hour * 60)}%`;
+
+    const label = document.createElement("span");
+    label.className = "axis-tick-label";
+    // "24:00" (rather than wrapping to "00:00") so the ruler's end doesn't
+    // look like a second copy of its start.
+    label.textContent = `${String(hour).padStart(2, "0")}:00`;
+    if (hour === 0) label.classList.add("axis-tick-label-start");
+    if (hour === 24) label.classList.add("axis-tick-label-end");
+
+    tick.append(label);
+    axis.append(tick);
+  }
+
   return axis;
 }
 
@@ -64,9 +84,9 @@ function buildTrack(sessions, onSessionClick) {
     block.className = `timeline-block ${LOCATION_CLASS[session.location] ?? "loc-other"}`;
     block.style.left = `${left}%`;
     // Minimum width keeps very short sessions visible and clickable.
-    block.style.width = `${Math.max(right - left, 1.5)}%`;
+    block.style.width = `${Math.max(right - left, 1)}%`;
     block.textContent = session.name;
-    block.title = `${session.name} · ${LOCATION_LABEL[session.location] ?? session.location} · ${formatTimeShort(session.start)}–${formatTimeShort(session.end)} · ${formatHours(durationHours(session.start, session.end))}`;
+    block.title = `${session.name} · ${LOCATION_LABEL[session.location] ?? session.location} · ${formatTimeShort(session.start)}–${formatTimeShort(session.end)} · ${formatDuration(durationMinutes(session.start, session.end))}`;
     block.addEventListener("click", () => onSessionClick(session));
 
     track.append(block);
@@ -94,12 +114,12 @@ function buildDayRow(date, sessions, onAddClick, onSessionClick) {
   timelineWrap.className = "day-row-timeline";
   timelineWrap.append(buildAxis(), buildTrack(sessions, onSessionClick));
 
-  const total = sessions.reduce((sum, s) => sum + durationHours(s.start, s.end), 0);
+  const totalMinutes = sessions.reduce((sum, s) => sum + durationMinutes(s.start, s.end), 0);
   const summary = document.createElement("div");
   summary.className = "day-row-summary";
   const totalEl = document.createElement("div");
   totalEl.className = "day-total";
-  totalEl.textContent = formatHours(total);
+  totalEl.textContent = formatDuration(totalMinutes);
   const addBtn = document.createElement("button");
   addBtn.type = "button";
   addBtn.className = "add-btn";
