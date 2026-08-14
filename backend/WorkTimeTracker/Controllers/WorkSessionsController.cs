@@ -15,11 +15,11 @@ namespace WorkTimeTracker.Controllers
             _sessionService = sessionService;
         }
 
-        // GET: api/WorkSessions
+        // GET: api/WorkSessions?startDate=2026-08-10&endDate=2026-08-14
         [HttpGet]
-        public ActionResult<IEnumerable<WorkSession>> GetWorkSession()
+        public ActionResult<IEnumerable<WorkSession>> GetWorkSession(DateOnly startDate, DateOnly endDate)
         {
-            return _sessionService.GetAllSessions();
+            return _sessionService.GetSessions(startDate, endDate);
         }
 
         // GET: api/WorkSessions/5
