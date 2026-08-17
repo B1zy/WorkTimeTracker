@@ -18,14 +18,23 @@
       <div class="week-summary">
         <div class="summary-hours">
           <span id="week-total-hours" class="summary-total">0h</span>
-          <span class="summary-target">/ 42.4h target</span>
+          <span class="summary-target">/ 42h target</span>
         </div>
         <span id="week-status-pill" class="status-indicator">—</span>
         <div class="summary-meter">
-          <div class="summary-bar-track">
-            <div id="summary-bar-fill" class="summary-bar-fill"></div>
+          <div class="summary-bar-wrapper">
+            <div class="summary-bar-track">
+              <div id="summary-bar-fill" class="summary-bar-fill"></div>
+            </div>
+            <div id="summary-bar-target-marker" class="summary-bar-target-marker"></div>
           </div>
-          <div id="summary-bar-target-marker" class="summary-bar-target-marker"></div>
+          <div class="correction-col">
+            <label for="correction-input" class="correction-label">Correction</label>
+            <div class="correction-input-wrap">
+              <input type="number" id="correction-input" class="correction-input" value="0" step="5" aria-label="Manual correction (minutes)" title="Manual correction (minutes)" />
+              <span class="correction-unit">min</span>
+            </div>
+          </div>
         </div>
       </div>
     </header>

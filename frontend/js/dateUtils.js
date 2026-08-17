@@ -55,6 +55,15 @@ export function durationMinutes(start, end) {
   return timeStringToMinutes(end) - timeStringToMinutes(start);
 }
 
+// True if [aStart, aEnd) and [bStart, bEnd) share any minutes.
+export function timeRangesOverlap(aStart, aEnd, bStart, bEnd) {
+  const aS = timeStringToMinutes(aStart);
+  const aE = timeStringToMinutes(aEnd);
+  const bS = timeStringToMinutes(bStart);
+  const bE = timeStringToMinutes(bEnd);
+  return aS < bE && bS < aE;
+}
+
 // Minutes -> "6h 42m". Drops whichever unit is zero so exact hours read as
 // "6h" instead of "6h 0m", and sub-hour durations read as "42m" alone.
 export function formatDuration(totalMinutes) {

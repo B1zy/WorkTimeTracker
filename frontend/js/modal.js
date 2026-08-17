@@ -31,7 +31,7 @@ function resetForm() {
   idInput.value = "";
 }
 
-export function openCreateModal(dateIso, dateObj, saveHandler) {
+export function openCreateModal(dateIso, dateObj, startTime, endTime, saveHandler) {
   resetForm();
   dialogTitle.textContent = "Add Session";
   dialogDateLabel.textContent = formatDayHeaderLabel(dateObj);
@@ -40,8 +40,35 @@ export function openCreateModal(dateIso, dateObj, saveHandler) {
   deleteBtn.hidden = true;
   onSave = saveHandler;
   onDelete = null;
+
+  // Defaults for a new session.
+  nameInput.value = "name";
+  locationInput.value = "InOffice";
+
+  // Start: use the dragged/clicked time on the timeline, or fall back to now.
+  let startStr;
+  if (startTime) {
+    startStr = startTime;
+  } else {
+    const now = new Date();
+    startStr = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}:00`;
+  }
+  startInput.value = startStr;
+
+  // End: use the drag end time if provided, otherwise default to start + 1h.
+  if (endTime) {
+    endInput.value = endTime;
+  } else {
+    const [sh, sm] = startStr.split(":").map(Number);
+    const endTotalMinutes = Math.min(sh * 60 + sm + 60, 23 * 60 + 59);
+    const eh = Math.floor(endTotalMinutes / 60);
+    const em = endTotalMinutes % 60;
+    endInput.value = `${String(eh).padStart(2, "0")}:${String(em).padStart(2, "0")}:00`;
+  }
+
   dialog.showModal();
   nameInput.focus();
+  nameInput.select();
 }
 
 export function openEditModal(session, dateObj, saveHandler, deleteHandler) {
@@ -64,9 +91,19 @@ export function openEditModal(session, dateObj, saveHandler, deleteHandler) {
   nameInput.focus();
 }
 
+endInput.addEventListener("input", () => endInput.setCustomValidity(""));
+startInput.addEventListener("input", () => endInput.setCustomValidity(""));
+
 form.addEventListener("submit", async (event) => {
   event.preventDefault();
   if (!onSave) return;
+
+  if (startInput.value && endInput.value && endInput.value <= startInput.value) {
+    endInput.setCustomValidity("End time must be after start time.");
+    endInput.reportValidity();
+    return;
+  }
+  endInput.setCustomValidity("");
 
   const session = {
     name: nameInput.value,
