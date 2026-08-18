@@ -1,10 +1,13 @@
 import { useMemo, useState } from "react";
-import { createSession, deleteSession, getSessions, updateSession } from "./api/workSessions";
+import { createSession, deleteSession, getAllSessions, updateSession } from "./api/workSessions";
+import { backupFilename, buildBackup, downloadJson, parseBackup } from "./utils/backup";
 import { addDays, formatWeekRangeLabel, getMonday, timeRangesOverlap, timeStringToMinutes, toISODate } from "./utils/dateUtils";
 import { minsToTimeStr, snapToNearestFreeSlot } from "./utils/timelineLayout";
+import { weekDates } from "./utils/workweek";
 import { computeWeekSummary, targetMarkerPercent } from "./utils/weekSummary";
 import { useWeekData } from "./hooks/useWeekData";
 import { useSessionDialog } from "./hooks/useSessionDialog";
+import { useWeekCorrections } from "./hooks/useWeekCorrections";
 import { useSettings } from "./contexts/SettingsContext";
 import { WeekHeader } from "./components/WeekHeader";
 import { ErrorBanner } from "./components/ErrorBanner";
@@ -30,22 +33,22 @@ async function deleteSessionsSequentially(ids: number[]): Promise<void> {
 
 function App() {
   const [currentMonday, setCurrentMonday] = useState(() => getMonday(new Date()));
-  // Keyed by the week's Monday (ISO date) so each week remembers its own
-  // correction instead of sharing one value that resets on navigation.
-  const [correctionByWeek, setCorrectionByWeek] = useState<Record<string, number>>({});
   const [mutationError, setMutationError] = useState<string | null>(null);
   const [view, setView] = useState<AppView>("week");
   const [settingsOpen, setSettingsOpen] = useState(false);
 
-  const { settings } = useSettings();
+  const { settings, updateSettings } = useSettings();
   const { sessionsByDate, totalMinutes, error: fetchError, refetch } = useWeekData(currentMonday);
   const dialog = useSessionDialog();
+  const { corrections, getCorrection, setCorrection, replaceAll: replaceCorrections } = useWeekCorrections();
 
   const mondayIso = useMemo(() => toISODate(currentMonday), [currentMonday]);
-  const correctionMinutes = correctionByWeek[mondayIso] ?? 0;
-  const friday = useMemo(() => addDays(currentMonday, 4), [currentMonday]);
-  const weekRangeLabel = useMemo(() => formatWeekRangeLabel(currentMonday, friday), [currentMonday, friday]);
-  const weekDays = useMemo(() => [0, 1, 2, 3, 4].map((n) => addDays(currentMonday, n)), [currentMonday]);
+  const correctionMinutes = getCorrection(mondayIso);
+  const weekDays = useMemo(() => weekDates(currentMonday, settings.workdays), [currentMonday, settings.workdays]);
+  const weekRangeLabel = useMemo(
+    () => formatWeekRangeLabel(weekDays[0], weekDays[weekDays.length - 1]),
+    [weekDays]
+  );
   const summary = useMemo(
     () => computeWeekSummary(totalMinutes, correctionMinutes, settings.weeklyTargetMinutes),
     [totalMinutes, correctionMinutes, settings.weeklyTargetMinutes]
@@ -75,7 +78,7 @@ function App() {
   }
 
   function handleCorrectionChange(value: number) {
-    setCorrectionByWeek((prev) => ({ ...prev, [mondayIso]: value }));
+    setCorrection(mondayIso, value);
   }
 
   function handleAddClick(dateIso: string, dateObj: Date, startTime?: string | null, endTime?: string | null) {
@@ -187,12 +190,54 @@ function App() {
   async function handleClearAllData() {
     try {
       setMutationError(null);
-      const all = await getSessions("1970-01-01", "2999-12-31");
+      const all = await getAllSessions();
       await deleteSessionsSequentially(all.map((s) => s.id));
       await refetch();
     } catch (err) {
       setMutationError(errorMessage(err));
     }
+  }
+
+  async function handleExportData() {
+    setMutationError(null);
+    const all = await getAllSessions();
+    downloadJson(backupFilename(), buildBackup(all, settings, corrections));
+  }
+
+  // Replace-only restore. Takes a safety copy of the current state first --
+  // this wipes everything, and "Clear all data" already taught that lesson.
+  async function handleImportData(
+    file: File,
+    onProgress?: (done: number, total: number) => void
+  ): Promise<{ imported: number; failed: number }> {
+    setMutationError(null);
+    const backup = parseBackup(await file.text());
+
+    const existing = await getAllSessions();
+    downloadJson(backupFilename("worktimetracker-pre-restore"), buildBackup(existing, settings, corrections));
+
+    await deleteSessionsSequentially(existing.map((s) => s.id));
+
+    // Sequential, and failures are collected rather than aborting: one bad row
+    // shouldn't strand the restore half-done.
+    let imported = 0;
+    let failed = 0;
+    for (const [index, session] of backup.sessions.entries()) {
+      try {
+        await createSession(session);
+        imported++;
+      } catch {
+        failed++;
+      }
+      onProgress?.(index + 1, backup.sessions.length);
+    }
+
+    if (backup.settings) updateSettings(() => backup.settings);
+    if (backup.corrections) replaceCorrections(backup.corrections);
+    await refetch();
+
+    if (failed > 0) setMutationError(`${failed} of ${backup.sessions.length} entries could not be restored.`);
+    return { imported, failed };
   }
 
   return (
@@ -234,7 +279,13 @@ function App() {
       </div>
 
       <SessionDialog state={dialog.state} onClose={dialog.close} />
-      <SettingsPanel isOpen={settingsOpen} onClose={() => setSettingsOpen(false)} onClearAllData={handleClearAllData} />
+      <SettingsPanel
+        isOpen={settingsOpen}
+        onClose={() => setSettingsOpen(false)}
+        onClearAllData={handleClearAllData}
+        onExportData={handleExportData}
+        onImportData={handleImportData}
+      />
     </>
   );
 }

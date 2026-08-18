@@ -2,11 +2,12 @@
 // block, keeping the other edge fixed. Clamped in real time against the
 // nearest sibling session so it can never be dragged into an overlap.
 
-import { useCallback, type MouseEvent as ReactMouseEvent, type RefObject } from "react";
+import { useCallback, type PointerEvent as ReactPointerEvent, type RefObject } from "react";
 import type { WorkSession } from "../types/WorkSession";
 import { formatTimeShort } from "../utils/dateUtils";
 import { minsToTimeStr, minutesToPercent, snapMinutesTo5 } from "../utils/timelineLayout";
 import { useDragTooltip } from "./useDragTooltip";
+import { beginPointerDrag } from "./pointerDrag";
 
 const MIN_DURATION_MIN = 5;
 
@@ -38,7 +39,7 @@ export function useDragToResize({
   const { showTooltip, hideTooltip } = useDragTooltip();
 
   const makeHandler = useCallback(
-    (edge: "start" | "end") => (event: ReactMouseEvent) => {
+    (edge: "start" | "end") => (event: ReactPointerEvent<HTMLSpanElement>) => {
       if (event.button !== 0) return;
       event.preventDefault();
       event.stopPropagation(); // don't also trigger the block's own move/click handling
@@ -47,57 +48,65 @@ export function useDragToResize({
       let pendingEnd = endMins;
       let moved = false;
       const block = blockRef.current;
+      const handle = event.currentTarget;
+      if (!block) return;
 
-      function handleMouseMove(moveEvent: MouseEvent) {
-        const track = trackRef.current;
-        if (!track || !block) return;
-        moved = true;
-
-        const rect = track.getBoundingClientRect();
-        const pointerMins = ((moveEvent.clientX - rect.left) / rect.width) * (rangeEndMin - rangeStartMin) + rangeStartMin;
-        const snapped = snapMinutesTo5(pointerMins);
-
-        if (edge === "start") {
-          pendingStart = Math.min(Math.max(snapped, leftBoundMins), endMins - MIN_DURATION_MIN);
-        } else {
-          pendingEnd = Math.max(Math.min(snapped, rightBoundMins), startMins + MIN_DURATION_MIN);
-        }
-
-        block.style.left = `${minutesToPercent(pendingStart, rangeStartMin, rangeEndMin)}%`;
-        block.style.width = `${Math.max(
-          minutesToPercent(pendingEnd, rangeStartMin, rangeEndMin) - minutesToPercent(pendingStart, rangeStartMin, rangeEndMin),
-          1
-        )}%`;
-        block.classList.add("timeline-block-dragging");
-        showTooltip(
-          edge === "start" ? formatTimeShort(minsToTimeStr(pendingStart)) : formatTimeShort(minsToTimeStr(pendingEnd)),
-          moveEvent.clientX,
-          moveEvent.clientY
-        );
+      function applyGeometry(start: number, end: number) {
+        if (!block) return;
+        const left = minutesToPercent(start, rangeStartMin, rangeEndMin);
+        const right = minutesToPercent(end, rangeStartMin, rangeEndMin);
+        block.style.left = `${left}%`;
+        block.style.width = `${Math.max(right - left, 1)}%`;
       }
 
-      async function handleMouseUp() {
-        document.removeEventListener("mousemove", handleMouseMove);
-        document.removeEventListener("mouseup", handleMouseUp);
-        hideTooltip();
-        block?.classList.remove("timeline-block-dragging");
+      beginPointerDrag(handle, event.pointerId, {
+        onMove(moveEvent) {
+          const track = trackRef.current;
+          if (!track || !block) return;
+          moved = true;
 
-        if (!moved) return;
+          const rect = track.getBoundingClientRect();
+          const pointerMins =
+            ((moveEvent.clientX - rect.left) / rect.width) * (rangeEndMin - rangeStartMin) + rangeStartMin;
+          const snapped = snapMinutesTo5(pointerMins);
 
-        const ok = await onSessionResize(session, minsToTimeStr(pendingStart), minsToTimeStr(pendingEnd));
-        if (!ok && block) {
-          block.style.left = `${minutesToPercent(startMins, rangeStartMin, rangeEndMin)}%`;
-          block.style.width = `${Math.max(
-            minutesToPercent(endMins, rangeStartMin, rangeEndMin) - minutesToPercent(startMins, rangeStartMin, rangeEndMin),
-            1
-          )}%`;
-          block.classList.add("timeline-block-invalid");
-          setTimeout(() => block.classList.remove("timeline-block-invalid"), 400);
-        }
-      }
+          if (edge === "start") {
+            pendingStart = Math.min(Math.max(snapped, leftBoundMins), endMins - MIN_DURATION_MIN);
+          } else {
+            pendingEnd = Math.max(Math.min(snapped, rightBoundMins), startMins + MIN_DURATION_MIN);
+          }
 
-      document.addEventListener("mousemove", handleMouseMove);
-      document.addEventListener("mouseup", handleMouseUp);
+          applyGeometry(pendingStart, pendingEnd);
+          block.classList.add("timeline-block-dragging");
+          showTooltip(
+            edge === "start"
+              ? formatTimeShort(minsToTimeStr(pendingStart))
+              : formatTimeShort(minsToTimeStr(pendingEnd)),
+            moveEvent.clientX,
+            moveEvent.clientY
+          );
+        },
+
+        async onEnd() {
+          hideTooltip();
+          block?.classList.remove("timeline-block-dragging");
+
+          if (!moved) return;
+
+          const ok = await onSessionResize(session, minsToTimeStr(pendingStart), minsToTimeStr(pendingEnd));
+          if (!ok && block) {
+            applyGeometry(startMins, endMins);
+            block.classList.add("timeline-block-invalid");
+            setTimeout(() => block.classList.remove("timeline-block-invalid"), 400);
+          }
+        },
+
+        onCancel() {
+          hideTooltip();
+          block?.classList.remove("timeline-block-dragging");
+          applyGeometry(startMins, endMins);
+        },
+      });
     },
     [
       trackRef,
@@ -116,7 +125,7 @@ export function useDragToResize({
   );
 
   return {
-    onResizeStartMouseDown: makeHandler("start"),
-    onResizeEndMouseDown: makeHandler("end"),
+    onResizeStartPointerDown: makeHandler("start"),
+    onResizeEndPointerDown: makeHandler("end"),
   };
 }

@@ -23,10 +23,10 @@ export function TimelineTrack({
   const trackRef = useRef<HTMLDivElement>(null);
   const ghostRef = useRef<HTMLDivElement>(null);
 
-  const { onMouseDown } = useDragToSelect(trackRef, ghostRef, onTrackClick, rangeStartMin, rangeEndMin);
+  const { onPointerDown } = useDragToSelect(trackRef, ghostRef, onTrackClick, rangeStartMin, rangeEndMin);
 
   return (
-    <div ref={trackRef} className="timeline-track" onMouseDown={onMouseDown}>
+    <div ref={trackRef} className="timeline-track" onPointerDown={onPointerDown}>
       {/* Ghost block shown while dragging to preview the selected range. */}
       <div ref={ghostRef} className="timeline-ghost" hidden />
       {sessions.map((session) => (

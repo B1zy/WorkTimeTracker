@@ -48,6 +48,19 @@
   box-sizing: border-box;
 }
 
+/* Visually hidden but exposed to assistive tech (used by the live announcer). */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
 body {
   margin: 0;
   background: var(--bg);
@@ -489,6 +502,10 @@ body {
     transparent calc(100% / 24)
   );
   cursor: crosshair;
+  /* All timeline drags are horizontal. `pan-y` lets the browser keep vertical
+     page scrolling while we claim horizontal movement -- `none` would trap the
+     page, and omitting it entirely would make touch drags scroll instead. */
+  touch-action: pan-y;
 }
 
 .timeline-block {
@@ -509,6 +526,14 @@ body {
   flex-direction: column;
   justify-content: center;
   gap: 1px;
+  touch-action: pan-y;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+.timeline-block:focus-visible {
+  outline: 2px solid var(--text-primary);
+  outline-offset: 2px;
+  z-index: 3;
 }
 .block-name-row {
   display: flex;
@@ -554,6 +579,13 @@ body {
   width: 9px;
   cursor: ew-resize;
   z-index: 1;
+  touch-action: pan-y;
+}
+/* 9px is fine for a mouse but unusable with a fingertip. */
+@media (pointer: coarse) {
+  .timeline-resize-handle {
+    width: 18px;
+  }
 }
 .timeline-resize-handle-start { left: -2px; }
 .timeline-resize-handle-end { right: -2px; }
@@ -612,6 +644,24 @@ body {
 .timeline-block.type-overtime-compensation { background: var(--type-overtime-compensation); }
 .timeline-block.type-appointment { background: var(--type-appointment); }
 .timeline-block.type-lunch { background: var(--type-lunch); }
+
+/* Entries that don't add to the day's total read as "present but not counted":
+   faded and hatched, so an ignored Appointment can't be mistaken for a counted
+   one. Subtracting entries get the same hatch in the over-target red. */
+.timeline-block.is-not-counted,
+.timeline-block.is-subtracted {
+  opacity: 0.75;
+  background-image: repeating-linear-gradient(
+    135deg,
+    rgba(0, 0, 0, 0.22) 0,
+    rgba(0, 0, 0, 0.22) 4px,
+    transparent 4px,
+    transparent 9px
+  );
+}
+.timeline-block.is-subtracted {
+  box-shadow: inset 0 0 0 1px var(--state-over);
+}
 
 .day-row-summary {
   display: flex;
@@ -1039,6 +1089,70 @@ select:focus {
   gap: 8px;
 }
 
+/* Work-day pickers: compact toggle chips rather than a stack of checkboxes,
+   so the whole week reads as one row. */
+.settings-weekday-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.settings-weekday {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 8px;
+  font-family: var(--font-display);
+  font-size: 0.72rem;
+  font-weight: 700;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  background: var(--surface-raised);
+  color: var(--text-dim);
+  cursor: pointer;
+  user-select: none;
+}
+.settings-weekday:hover {
+  border-color: var(--accent);
+}
+.settings-weekday.is-on {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+.settings-weekday:has(input:disabled) {
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+.settings-weekday input {
+  margin: 0;
+  cursor: inherit;
+}
+
+.settings-counting-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.settings-counting-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 0.85rem;
+  color: var(--text-primary);
+}
+.settings-counting-row select {
+  flex-shrink: 0;
+  min-width: 170px;
+  font-size: 0.8rem;
+  padding: 4px 6px;
+}
+.settings-counting-row select:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
 .settings-color-row {
   display: flex;
   align-items: center;
@@ -1052,6 +1166,18 @@ select:focus {
   height: 28px;
   padding: 2px;
   cursor: pointer;
+}
+
+.settings-backup-actions {
+  display: flex;
+  gap: 8px;
+}
+.settings-backup-actions .btn-secondary {
+  flex: 1;
+}
+
+.settings-backup-status {
+  color: var(--text-primary);
 }
 
 .settings-clear-btn {

@@ -10,8 +10,10 @@ import {
   nearestLeftBoundary,
   nearestRightBoundary,
 } from "../utils/timelineLayout";
+import { useSettings } from "../contexts/SettingsContext";
 import { useDragToMove } from "../hooks/useDragToMove";
 import { useDragToResize } from "../hooks/useDragToResize";
+import { useKeyboardAdjust } from "../hooks/useKeyboardAdjust";
 
 interface TimelineBlockProps {
   session: WorkSession;
@@ -32,6 +34,8 @@ export function TimelineBlock({
   onSessionClick,
   onSessionMove,
 }: TimelineBlockProps) {
+  const { settings } = useSettings();
+  const counting = settings.entryTypeCounting;
   const blockRef = useRef<HTMLButtonElement>(null);
   const startMins = timeStringToMinutes(session.start);
   const endMins = timeStringToMinutes(session.end);
@@ -46,7 +50,7 @@ export function TimelineBlock({
   const leftBoundMins = nearestLeftBoundary(startMins, siblingIntervals, rangeStartMin);
   const rightBoundMins = nearestRightBoundary(endMins, siblingIntervals, rangeEndMin);
 
-  const { onMouseDown, onClick } = useDragToMove({
+  const { onPointerDown, onClick } = useDragToMove({
     trackRef,
     blockRef,
     session,
@@ -59,7 +63,7 @@ export function TimelineBlock({
     onSessionMove,
   });
 
-  const { onResizeStartMouseDown, onResizeEndMouseDown } = useDragToResize({
+  const { onResizeStartPointerDown, onResizeEndPointerDown } = useDragToResize({
     trackRef,
     blockRef,
     session,
@@ -72,24 +76,46 @@ export function TimelineBlock({
     onSessionResize: onSessionMove,
   });
 
+  const { onKeyDown, onBlur } = useKeyboardAdjust({
+    blockRef,
+    session,
+    startMins,
+    endMins,
+    leftBoundMins,
+    rightBoundMins,
+    rangeStartMin,
+    rangeEndMin,
+    onSessionMove,
+  });
+
   const entryTypeClass = ENTRY_TYPE_CLASS[session.entryType];
   const colorClass = entryTypeClass ?? LOCATION_CLASS[session.location] ?? "loc-other";
   const typeLabel = ENTRY_TYPE_LABEL[session.entryType] ?? session.entryType;
+  // Make it visible on the timeline that an entry isn't contributing to the
+  // day's total -- otherwise an ignored Appointment looks identical to a
+  // counted one.
+  const countingMode = counting[session.entryType];
+  const countingClass =
+    countingMode === "ignore" ? " is-not-counted" : countingMode === "subtract" ? " is-subtracted" : "";
   const title = `${session.name} · ${typeLabel}${entryTypeClass ? "" : ` · ${LOCATION_LABEL[session.location] ?? session.location}`} · ${formatTimeShort(session.start)}–${formatTimeShort(session.end)} · ${formatDuration(durationMinutes(session.start, session.end))}`;
 
   return (
     <button
       ref={blockRef}
       type="button"
-      className={`timeline-block ${colorClass}`}
+      className={`timeline-block ${colorClass}${countingClass}`}
       style={{ left: `${left}%`, width: `${width}%` }}
       title={title}
-      onMouseDown={onMouseDown}
+      aria-label={title}
+      aria-keyshortcuts="ArrowLeft ArrowRight Shift+ArrowLeft Shift+ArrowRight Alt+ArrowLeft Alt+ArrowRight"
+      onPointerDown={onPointerDown}
       onClick={onClick}
+      onKeyDown={onKeyDown}
+      onBlur={onBlur}
     >
       <span
         className="timeline-resize-handle timeline-resize-handle-start"
-        onMouseDown={onResizeStartMouseDown}
+        onPointerDown={onResizeStartPointerDown}
         aria-hidden="true"
       />
       <span className="block-name-row">
@@ -99,7 +125,7 @@ export function TimelineBlock({
       {session.description && <span className="block-desc">{session.description}</span>}
       <span
         className="timeline-resize-handle timeline-resize-handle-end"
-        onMouseDown={onResizeEndMouseDown}
+        onPointerDown={onResizeEndPointerDown}
         aria-hidden="true"
       />
     </button>

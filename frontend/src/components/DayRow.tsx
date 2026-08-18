@@ -1,6 +1,8 @@
 import type { WorkSession } from "../types/WorkSession";
 import { useSettings } from "../contexts/SettingsContext";
-import { durationMinutes, formatDayShort, formatDuration, formatWeekdayShort, toISODate } from "../utils/dateUtils";
+import { formatDayShort, formatDuration, formatWeekdayShort, toISODate } from "../utils/dateUtils";
+import { sumCountedMinutes } from "../utils/entryTypeCounting";
+import { workdayCount } from "../utils/workweek";
 import { classifySummaryState, dayTargetLabel, dayTargetMinutes } from "../utils/weekSummary";
 import { TimelineAxis } from "./TimelineAxis";
 import { TimelineTrack } from "./TimelineTrack";
@@ -24,8 +26,12 @@ export function DayRow({
 }: DayRowProps) {
   const { settings } = useSettings();
   const iso = toISODate(date);
-  const totalMinutes = sessions.reduce((sum, s) => sum + durationMinutes(s.start, s.end), 0);
-  const dayState = classifySummaryState(totalMinutes, dayTargetMinutes(settings.weeklyTargetMinutes));
+  const activeDayCount = workdayCount(settings.workdays);
+  const totalMinutes = sumCountedMinutes(sessions, settings.entryTypeCounting);
+  const dayState = classifySummaryState(
+    totalMinutes,
+    dayTargetMinutes(settings.weeklyTargetMinutes, activeDayCount)
+  );
 
   return (
     <div className="day-row">
@@ -49,7 +55,7 @@ export function DayRow({
       <div className="day-row-summary">
         <div className="day-total-group">
           <div className={`day-total state-${dayState}`}>{formatDuration(totalMinutes)}</div>
-          <div className="day-target">/ {dayTargetLabel(settings.weeklyTargetMinutes)}</div>
+          <div className="day-target">/ {dayTargetLabel(settings.weeklyTargetMinutes, activeDayCount)}</div>
         </div>
         <div className="day-row-actions">
           <button type="button" className="add-btn" onClick={() => onAddClick(iso, date, null, null)}>

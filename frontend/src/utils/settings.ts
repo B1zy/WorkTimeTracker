@@ -1,6 +1,13 @@
 // Persisted, user-customizable app settings (colors, weekly target, timebar
 // range). Kept entirely client-side (localStorage) -- the backend doesn't
 // need to know about presentation preferences.
+//
+// NOTE: loadSettings() below enumerates every field explicitly rather than
+// spreading `parsed`. Any field added to AppSettings MUST get a line there too,
+// or it reads as undefined at runtime for anyone with an existing stored blob.
+
+import { DEFAULT_ENTRY_TYPE_COUNTING, sanitizeCounting, type EntryTypeCounting } from "./entryTypeCounting";
+import { DEFAULT_WORKDAYS, sanitizeWorkdays, type Weekday } from "./workweek";
 
 export interface SettingsColors {
   locRemote: string;
@@ -19,6 +26,10 @@ export interface AppSettings {
   // dragging within. Defaults to the full day (0 - 1440).
   timelineStartMin: number;
   timelineEndMin: number;
+  // How each entry type contributes to worked-time totals.
+  entryTypeCounting: EntryTypeCounting;
+  // Which weekdays are shown on the week view and counted toward totals.
+  workdays: Weekday[];
 }
 
 export const DEFAULT_COLORS: SettingsColors = {
@@ -40,6 +51,8 @@ export const DEFAULT_SETTINGS: AppSettings = {
   colors: DEFAULT_COLORS,
   timelineStartMin: DEFAULT_TIMELINE_START_MIN,
   timelineEndMin: DEFAULT_TIMELINE_END_MIN,
+  entryTypeCounting: DEFAULT_ENTRY_TYPE_COUNTING,
+  workdays: DEFAULT_WORKDAYS,
 };
 
 const STORAGE_KEY = "worktimetracker.settings.v1";
@@ -82,6 +95,8 @@ export function loadSettings(): AppSettings {
       colors: { ...DEFAULT_COLORS, ...parsed.colors },
       timelineStartMin: parsed.timelineStartMin ?? DEFAULT_TIMELINE_START_MIN,
       timelineEndMin: parsed.timelineEndMin ?? DEFAULT_TIMELINE_END_MIN,
+      entryTypeCounting: sanitizeCounting(parsed.entryTypeCounting),
+      workdays: sanitizeWorkdays(parsed.workdays),
     };
   } catch {
     return DEFAULT_SETTINGS;

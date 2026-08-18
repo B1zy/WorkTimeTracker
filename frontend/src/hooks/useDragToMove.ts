@@ -2,15 +2,18 @@
 // duration. The block's position is mutated directly via its ref during the
 // drag (not React state), matching useDragToSelect's approach.
 
-import { useCallback, useRef, type MouseEvent as ReactMouseEvent, type RefObject } from "react";
+import { useCallback, useRef, type PointerEvent as ReactPointerEvent, type RefObject } from "react";
 import type { WorkSession } from "../types/WorkSession";
 import { formatTimeShort } from "../utils/dateUtils";
 import { minsToTimeStr, minutesToPercent } from "../utils/timelineLayout";
 import { useDragTooltip } from "./useDragTooltip";
+import { beginPointerDrag } from "./pointerDrag";
 
-// Minimum pointer movement (px) before a mousedown on a session block counts
-// as a drag-to-move rather than a plain click (which opens the edit modal).
-const MOVE_THRESHOLD_PX = 4;
+// Minimum pointer movement before a press on a session block counts as a
+// drag-to-move rather than a plain click (which opens the edit modal).
+// A finger is far less steady than a mouse, hence the larger touch threshold.
+const MOUSE_MOVE_THRESHOLD_PX = 4;
+const TOUCH_MOVE_THRESHOLD_PX = 10;
 
 interface UseDragToMoveOptions {
   trackRef: RefObject<HTMLDivElement | null>;
@@ -41,60 +44,71 @@ export function useDragToMove({
   const blockDuration = endMins - startMins;
   const movedRef = useRef(false);
 
-  const onMouseDown = useCallback(
-    (event: ReactMouseEvent<HTMLButtonElement>) => {
+  const onPointerDown = useCallback(
+    (event: ReactPointerEvent<HTMLButtonElement>) => {
       if (event.button !== 0) return;
       event.preventDefault(); // prevent text-selection cursor during drag
 
       const moveStartX = event.clientX;
+      const threshold = event.pointerType === "mouse" ? MOUSE_MOVE_THRESHOLD_PX : TOUCH_MOVE_THRESHOLD_PX;
       movedRef.current = false;
       let pendingStart = startMins;
       let pendingEnd = endMins;
       const block = blockRef.current;
+      if (!block) return;
 
-      function handleMouseMove(moveEvent: MouseEvent) {
-        const deltaX = moveEvent.clientX - moveStartX;
-        if (!movedRef.current && Math.abs(deltaX) < MOVE_THRESHOLD_PX) return;
-        movedRef.current = true;
-
-        const track = trackRef.current;
-        if (!track || !block) return;
-        const rect = track.getBoundingClientRect();
-        const deltaMins = (deltaX / rect.width) * (rangeEndMin - rangeStartMin);
-        let newStart = Math.round(startMins + deltaMins);
-        newStart = Math.min(Math.max(newStart, rangeStartMin), rangeEndMin - blockDuration);
-        const newEnd = newStart + blockDuration;
-        pendingStart = newStart;
-        pendingEnd = newEnd;
-
-        block.style.left = `${minutesToPercent(newStart, rangeStartMin, rangeEndMin)}%`;
-        block.classList.add("timeline-block-dragging");
-        showTooltip(
-          `${formatTimeShort(minsToTimeStr(newStart))} – ${formatTimeShort(minsToTimeStr(newEnd))}`,
-          moveEvent.clientX,
-          moveEvent.clientY
-        );
+      function restoreOriginalPosition() {
+        if (block) block.style.left = `${leftPercent}%`;
       }
 
-      async function handleMouseUp() {
-        document.removeEventListener("mousemove", handleMouseMove);
-        document.removeEventListener("mouseup", handleMouseUp);
-        hideTooltip();
-        block?.classList.remove("timeline-block-dragging");
+      beginPointerDrag(block, event.pointerId, {
+        onMove(moveEvent) {
+          const deltaX = moveEvent.clientX - moveStartX;
+          if (!movedRef.current && Math.abs(deltaX) < threshold) return;
+          movedRef.current = true;
 
-        if (!movedRef.current) return; // handled as a plain click via onClick below
+          const track = trackRef.current;
+          if (!track || !block) return;
+          const rect = track.getBoundingClientRect();
+          const deltaMins = (deltaX / rect.width) * (rangeEndMin - rangeStartMin);
+          let newStart = Math.round(startMins + deltaMins);
+          newStart = Math.min(Math.max(newStart, rangeStartMin), rangeEndMin - blockDuration);
+          const newEnd = newStart + blockDuration;
+          pendingStart = newStart;
+          pendingEnd = newEnd;
 
-        const ok = await onSessionMove(session, minsToTimeStr(pendingStart), minsToTimeStr(pendingEnd));
-        if (!ok && block) {
-          // Revert visually since a failed move doesn't trigger a re-render.
-          block.style.left = `${leftPercent}%`;
-          block.classList.add("timeline-block-invalid");
-          setTimeout(() => block.classList.remove("timeline-block-invalid"), 400);
-        }
-      }
+          block.style.left = `${minutesToPercent(newStart, rangeStartMin, rangeEndMin)}%`;
+          block.classList.add("timeline-block-dragging");
+          showTooltip(
+            `${formatTimeShort(minsToTimeStr(newStart))} – ${formatTimeShort(minsToTimeStr(newEnd))}`,
+            moveEvent.clientX,
+            moveEvent.clientY
+          );
+        },
 
-      document.addEventListener("mousemove", handleMouseMove);
-      document.addEventListener("mouseup", handleMouseUp);
+        async onEnd() {
+          hideTooltip();
+          block?.classList.remove("timeline-block-dragging");
+
+          if (!movedRef.current) return; // handled as a plain click via onClick below
+
+          const ok = await onSessionMove(session, minsToTimeStr(pendingStart), minsToTimeStr(pendingEnd));
+          if (!ok && block) {
+            // Revert visually since a failed move doesn't trigger a re-render.
+            restoreOriginalPosition();
+            block.classList.add("timeline-block-invalid");
+            setTimeout(() => block.classList.remove("timeline-block-invalid"), 400);
+          }
+        },
+
+        // Gesture reclaimed by the browser: drop the move entirely.
+        onCancel() {
+          hideTooltip();
+          block?.classList.remove("timeline-block-dragging");
+          restoreOriginalPosition();
+          movedRef.current = false;
+        },
+      });
     },
     [
       trackRef,
@@ -120,5 +134,5 @@ export function useDragToMove({
     onSessionClick(session);
   }, [onSessionClick, session]);
 
-  return { onMouseDown, onClick };
+  return { onPointerDown, onClick };
 }

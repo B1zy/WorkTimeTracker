@@ -31,6 +31,12 @@ export async function getSessions(startDate: string, endDate: string): Promise<W
   return handleResponse<WorkSession[]>(response);
 }
 
+// Every session, regardless of date. The backend has no "all" endpoint, so
+// this is the range query with bounds wide enough to cover anything real.
+export async function getAllSessions(): Promise<WorkSession[]> {
+  return getSessions("1970-01-01", "2999-12-31");
+}
+
 // GET /api/WorkSessions/{id}
 export async function getSessionById(id: number): Promise<WorkSession> {
   const response = await fetch(`${BASE_URL}/${id}`);

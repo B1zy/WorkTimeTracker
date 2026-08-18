@@ -18,14 +18,15 @@ export function meterMaxMinutes(weekTargetMinutes: number): number {
   return weekTargetMinutes * (1 + METER_HEADROOM_RATIO);
 }
 
-// 42h split evenly across a 5-day work week (or whatever the configured
-// weekly target is).
-export function dayTargetMinutes(weekTargetMinutes: number): number {
-  return weekTargetMinutes / 5;
+// The weekly target split evenly across however many work days are active.
+// `workdayCount` is guaranteed >= 1 by sanitizeWorkdays, but guard anyway --
+// a zero here would silently produce an Infinity target.
+export function dayTargetMinutes(weekTargetMinutes: number, workdayCount: number): number {
+  return weekTargetMinutes / Math.max(workdayCount, 1);
 }
 
-export function dayTargetLabel(weekTargetMinutes: number): string {
-  return `${(dayTargetMinutes(weekTargetMinutes) / 60).toFixed(1)}h`;
+export function dayTargetLabel(weekTargetMinutes: number, workdayCount: number): string {
+  return `${(dayTargetMinutes(weekTargetMinutes, workdayCount) / 60).toFixed(1)}h`;
 }
 
 // Color bands based on how far off a target we are:

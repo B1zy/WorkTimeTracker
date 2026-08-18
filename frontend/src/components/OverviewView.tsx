@@ -3,6 +3,8 @@ import { useSettings } from "../contexts/SettingsContext";
 import { useOverviewData } from "../hooks/useOverviewData";
 import { buildCalendarYearWeeks } from "../utils/calendar";
 import { formatDuration, getMonday, toISODate } from "../utils/dateUtils";
+import { workdayCount, workdayOffsets } from "../utils/workweek";
+import { dayTargetMinutes } from "../utils/weekSummary";
 
 function intensityClass(minutes: number, dayTarget: number): string {
   if (minutes <= 0) return "level-0";
@@ -26,17 +28,29 @@ export function OverviewView() {
   // Always the full calendar year, oldest-to-newest left-to-right (January on
   // the left, December on the right), rather than a trailing window that
   // wraps around mid-year.
-  const weeks = useMemo(() => buildCalendarYearWeeks(year), [year]);
-  const columnStyle = useMemo(() => ({ gridTemplateColumns: `repeat(${weeks.length}, minmax(3px, 1fr))` }), [weeks.length]);
+  const offsets = useMemo(() => workdayOffsets(settings.workdays), [settings.workdays]);
+  const weeks = useMemo(() => buildCalendarYearWeeks(year, offsets), [year, offsets]);
+  // Both axes are driven from the data: columns = weeks in the year, rows =
+  // active work days. The static repeat(5, ...) in index.css is only a fallback.
+  const columnStyle = useMemo(
+    () => ({ gridTemplateColumns: `repeat(${weeks.length}, minmax(3px, 1fr))` }),
+    [weeks.length]
+  );
+  const gridStyle = useMemo(
+    () => ({ ...columnStyle, gridTemplateRows: `repeat(${offsets.length}, 11px)` }),
+    [columnStyle, offsets.length]
+  );
   const startIso = toISODate(weeks[0][0]);
-  const endIso = toISODate(weeks[weeks.length - 1][4]);
+  const endIso = toISODate(weeks[weeks.length - 1][weeks[weeks.length - 1].length - 1]);
   const { minutesByDate, loading, error } = useOverviewData(startIso, endIso);
 
-  const dayTarget = settings.weeklyTargetMinutes / 5;
   const weekTarget = settings.weeklyTargetMinutes;
+  const dayTarget = dayTargetMinutes(weekTarget, workdayCount(settings.workdays));
 
   const totalMinutes = useMemo(() => Object.values(minutesByDate).reduce((sum, m) => sum + m, 0), [minutesByDate]);
-  const trackedDayCount = useMemo(() => Object.values(minutesByDate).filter((m) => m > 0).length, [minutesByDate]);
+  // `!== 0` rather than `> 0`: with OvertimeCompensation subtracting, a day can
+  // legitimately total negative and still be a day that has entries.
+  const trackedDayCount = useMemo(() => Object.values(minutesByDate).filter((m) => m !== 0).length, [minutesByDate]);
 
   // Per-week totals, oldest first -- the basis for both the "weeks with
   // entries" average and the running carryover balance below.
@@ -48,7 +62,7 @@ export function OverviewView() {
   // Only weeks that actually have entries count toward the average -- weeks
   // you haven't reached yet (or hadn't started using the app) shouldn't drag
   // it down.
-  const trackedWeekCount = weekTotals.filter((m) => m > 0).length;
+  const trackedWeekCount = weekTotals.filter((m) => m !== 0).length;
   const averagePerWeek = trackedWeekCount > 0 ? totalMinutes / trackedWeekCount : 0;
 
   const todayMondayIso = toISODate(todayMonday);
@@ -60,7 +74,7 @@ export function OverviewView() {
   // count against you either.
   const carryoverMinutes = useMemo(() => {
     const priorWeeks = currentWeekIndex >= 0 ? weekTotals.slice(0, currentWeekIndex) : weekTotals;
-    return priorWeeks.reduce((sum, minutes) => (minutes > 0 ? sum + (minutes - weekTarget) : sum), 0);
+    return priorWeeks.reduce((sum, minutes) => (minutes !== 0 ? sum + (minutes - weekTarget) : sum), 0);
   }, [weekTotals, weekTarget, currentWeekIndex]);
 
   // One label per column where the month changes, matching GitHub's
@@ -118,13 +132,13 @@ export function OverviewView() {
               </span>
             ))}
           </div>
-          <div className="overview-grid" style={columnStyle} aria-hidden={loading}>
+          <div className="overview-grid" style={gridStyle} aria-hidden={loading}>
             {weeks.map((week) =>
               week.map((day) => {
                 const iso = toISODate(day);
                 const minutes = minutesByDate[iso] ?? 0;
                 const tooltip = `${day.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" })} — ${
-                  minutes > 0 ? formatDuration(minutes) : "No entries"
+                  minutes !== 0 ? formatDuration(minutes) : "No entries"
                 }`;
                 return <div key={iso} className={`overview-cell ${intensityClass(minutes, dayTarget)}`} title={tooltip} />;
               })
