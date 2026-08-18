@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ChangeEvent } from "react";
+import { useRef, useState, type ChangeEvent } from "react";
 import { useSettings } from "../contexts/SettingsContext";
 import {
   COLOR_LABEL,
@@ -20,8 +20,6 @@ import type { EntryType } from "../types/WorkSession";
 const ENTRY_TYPES: EntryType[] = ["Working", "Sick", "OvertimeCompensation", "Appointment", "Lunch"];
 
 interface SettingsPanelProps {
-  isOpen: boolean;
-  onClose: () => void;
   onClearAllData: () => Promise<void>;
   onExportData: () => Promise<void>;
   onImportData: (
@@ -30,31 +28,16 @@ interface SettingsPanelProps {
   ) => Promise<{ imported: number; failed: number }>;
 }
 
-export function SettingsPanel({
-  isOpen,
-  onClose,
-  onClearAllData,
-  onExportData,
-  onImportData,
-}: SettingsPanelProps) {
-  const dialogRef = useRef<HTMLDialogElement>(null);
+// Rendered inline at the bottom of the Overview tab (not a modal): the whole
+// point of moving it here was to have the chart and the settings that shape
+// it on one scrollable page instead of a popup you can't see the data behind.
+export function SettingsPanel({ onClearAllData, onExportData, onImportData }: SettingsPanelProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { settings, updateSettings } = useSettings();
   const [confirmingClear, setConfirmingClear] = useState(false);
   const [clearing, setClearing] = useState(false);
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
-
-  useEffect(() => {
-    const dialog = dialogRef.current;
-    if (!dialog) return;
-    if (isOpen && !dialog.open) dialog.showModal();
-    if (!isOpen && dialog.open) dialog.close();
-  }, [isOpen]);
-
-  useEffect(() => {
-    if (!isOpen) setConfirmingClear(false);
-  }, [isOpen]);
 
   function handleTargetHoursChange(event: ChangeEvent<HTMLInputElement>) {
     const hours = Number(event.target.value);
@@ -148,7 +131,7 @@ export function SettingsPanel({
   }
 
   return (
-    <dialog ref={dialogRef} className="session-dialog settings-dialog" onCancel={onClose}>
+    <section className="settings-inline">
       <h2 id="settings-title">Settings</h2>
 
       <section className="settings-section">
@@ -336,14 +319,6 @@ export function SettingsPanel({
         )}
       </section>
 
-      <div className="dialog-actions">
-        <div />
-        <div className="dialog-actions-right">
-          <button type="button" className="btn-primary" onClick={onClose}>
-            Done
-          </button>
-        </div>
-      </div>
-    </dialog>
+    </section>
   );
 }

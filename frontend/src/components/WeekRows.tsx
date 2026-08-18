@@ -14,8 +14,14 @@ interface WeekRowsProps {
 export function WeekRows({ weekDays, sessionsByDate, ...callbacks }: WeekRowsProps) {
   return (
     <main className="week-rows">
-      {weekDays.map((date) => (
-        <DayRow key={toISODate(date)} date={date} sessions={sessionsByDate[toISODate(date)] ?? []} {...callbacks} />
+      {weekDays.map((date, index) => (
+        <DayRow
+          key={toISODate(date)}
+          date={date}
+          sessions={sessionsByDate[toISODate(date)] ?? []}
+          index={index}
+          {...callbacks}
+        />
       ))}
     </main>
   );

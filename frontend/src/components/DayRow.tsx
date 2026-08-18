@@ -1,3 +1,4 @@
+import type { CSSProperties } from "react";
 import type { WorkSession } from "../types/WorkSession";
 import { useSettings } from "../contexts/SettingsContext";
 import { formatDayShort, formatDuration, formatWeekdayShort, toISODate } from "../utils/dateUtils";
@@ -10,6 +11,7 @@ import { TimelineTrack } from "./TimelineTrack";
 interface DayRowProps {
   date: Date;
   sessions: WorkSession[];
+  index: number;
   onAddClick: (dateIso: string, dateObj: Date, startTime?: string | null, endTime?: string | null) => void;
   onSessionClick: (session: WorkSession) => void;
   onSessionMove: (session: WorkSession, newStart: string, newEnd: string) => Promise<boolean>;
@@ -19,6 +21,7 @@ interface DayRowProps {
 export function DayRow({
   date,
   sessions,
+  index,
   onAddClick,
   onSessionClick,
   onSessionMove,
@@ -34,7 +37,7 @@ export function DayRow({
   );
 
   return (
-    <div className="day-row">
+    <div className="day-row" style={{ "--row-index": index } as CSSProperties}>
       <div className="day-row-header">
         <div className="weekday">{formatWeekdayShort(date)}</div>
         <div className="date">{formatDayShort(date)}</div>

@@ -15,7 +15,6 @@ import { WeekRows } from "./components/WeekRows";
 import { SessionDialog } from "./components/SessionDialog";
 import { TopNav, type AppView } from "./components/TopNav";
 import { OverviewView } from "./components/OverviewView";
-import { SettingsPanel } from "./components/SettingsPanel";
 import type { NewWorkSession, WorkSession } from "./types/WorkSession";
 
 function errorMessage(err: unknown): string {
@@ -35,7 +34,6 @@ function App() {
   const [currentMonday, setCurrentMonday] = useState(() => getMonday(new Date()));
   const [mutationError, setMutationError] = useState<string | null>(null);
   const [view, setView] = useState<AppView>("week");
-  const [settingsOpen, setSettingsOpen] = useState(false);
 
   const { settings, updateSettings } = useSettings();
   const { sessionsByDate, totalMinutes, error: fetchError, refetch } = useWeekData(currentMonday);
@@ -243,7 +241,7 @@ function App() {
   return (
     <>
       <div className="app">
-        <TopNav view={view} onChangeView={setView} onOpenSettings={() => setSettingsOpen(true)} />
+        <TopNav view={view} onChangeView={setView} />
 
         {view === "week" ? (
           <>
@@ -274,18 +272,15 @@ function App() {
             />
           </>
         ) : (
-          <OverviewView />
+          <OverviewView
+            onClearAllData={handleClearAllData}
+            onExportData={handleExportData}
+            onImportData={handleImportData}
+          />
         )}
       </div>
 
       <SessionDialog state={dialog.state} onClose={dialog.close} />
-      <SettingsPanel
-        isOpen={settingsOpen}
-        onClose={() => setSettingsOpen(false)}
-        onClearAllData={handleClearAllData}
-        onExportData={handleExportData}
-        onImportData={handleImportData}
-      />
     </>
   );
 }

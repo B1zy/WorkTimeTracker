@@ -671,7 +671,11 @@ body {
 .day-row-summary {
   display: flex;
   flex-direction: column;
-  align-items: flex-end;
+  /* Centered rather than right-aligned: right-align only lines up the two
+     rows' edges when their widths happen to match ("8h 46m" vs "+ADD CLEAR"),
+     which isn't reliable -- centering keeps them on the same axis regardless
+     of how wide the duration text is. */
+  align-items: center;
   gap: 6px;
 }
 
@@ -1010,27 +1014,22 @@ select:focus {
   border-color: var(--border);
 }
 
-.top-nav-settings-btn {
-  width: 34px;
-  height: 34px;
-  border-radius: var(--radius);
-  border: 1px solid var(--border-strong);
-  background: var(--surface-raised);
-  color: var(--text-primary);
-  font-size: 1rem;
-  cursor: pointer;
-}
-.top-nav-settings-btn:hover {
-  border-color: var(--accent);
-  color: var(--accent);
-}
-
 /* --- Settings panel --- */
+/* Inline on the Overview tab (not a modal): same card language as .overview
+   so the two read as one continuous page instead of a popup over the chart. */
 
-.settings-dialog {
-  width: min(460px, 90vw);
-  max-height: 85vh;
-  overflow-y: auto;
+.settings-inline {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 20px 24px;
+  margin-top: 16px;
+}
+#settings-title {
+  font-family: var(--font-display);
+  margin: 0;
+  font-size: 1.1rem;
+  letter-spacing: 0.01em;
 }
 
 .settings-section {
@@ -1375,4 +1374,150 @@ select:focus {
   padding: 10px 14px;
   margin-bottom: 16px;
   font-size: 0.85rem;
+}
+
+/* --- Motion ---
+   Entrance animations replay whenever their elements actually mount -- day
+   rows remount on every week change (keyed by ISO date), the whole Overview
+   tree remounts on every tab switch, so no extra JS trigger is needed. Press
+   feedback is the same idea applied to clicks: a quick, tactile scale-down
+   that fits the console/switch-panel language the rest of the UI already
+   uses (lamp-pulse, the invalid-flash on a rejected drag, etc). */
+
+@keyframes row-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.day-row {
+  animation: row-in 0.32s ease-out backwards;
+  animation-delay: calc(var(--row-index, 0) * 45ms);
+}
+
+@keyframes block-in {
+  from {
+    opacity: 0;
+    transform: scale(0.85);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+.timeline-block {
+  animation: block-in 0.2s ease-out;
+}
+
+@keyframes card-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.week-header {
+  animation: card-in 0.25s ease-out;
+}
+.overview {
+  animation: card-in 0.25s ease-out;
+}
+.settings-inline {
+  animation: card-in 0.3s ease-out backwards;
+  animation-delay: 0.08s;
+}
+
+/* A left-to-right "power on" sweep across the year, like a bank of console
+   lamps lighting in sequence -- capped so a full year's worth of cells still
+   finishes well under a second. */
+@keyframes cell-in {
+  from {
+    opacity: 0;
+    transform: scale(0.4);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+.overview-grid .overview-cell {
+  animation: cell-in 0.3s ease-out backwards;
+  animation-delay: min(calc(var(--week-index, 0) * 4ms), 260ms);
+}
+
+/* Tactile press feedback, consistent across every clickable control. */
+.nav-btn,
+.top-nav-tab,
+.add-btn,
+.remove-all-btn,
+.correction-btn,
+.correction-popover-btn,
+.week-range-btn,
+.settings-weekday,
+.settings-reset-btn,
+.btn-primary,
+.btn-secondary,
+.btn-delete {
+  transition: transform 0.1s ease, filter 0.1s ease, background-color 0.15s ease, border-color 0.15s ease,
+    color 0.15s ease;
+}
+.nav-btn:active,
+.top-nav-tab:active,
+.add-btn:active,
+.remove-all-btn:active,
+.correction-btn:active,
+.correction-popover-btn:active,
+.week-range-btn:active,
+.settings-weekday:active,
+.settings-reset-btn:active,
+.btn-primary:active,
+.btn-secondary:active,
+.btn-delete:active {
+  transform: scale(0.94);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .day-row,
+  .timeline-block,
+  .week-header,
+  .overview,
+  .settings-inline,
+  .overview-grid .overview-cell {
+    animation: none;
+  }
+  .nav-btn,
+  .top-nav-tab,
+  .add-btn,
+  .remove-all-btn,
+  .correction-btn,
+  .correction-popover-btn,
+  .week-range-btn,
+  .settings-weekday,
+  .settings-reset-btn,
+  .btn-primary,
+  .btn-secondary,
+  .btn-delete {
+    transition: none;
+  }
+  .nav-btn:active,
+  .top-nav-tab:active,
+  .add-btn:active,
+  .remove-all-btn:active,
+  .correction-btn:active,
+  .correction-popover-btn:active,
+  .week-range-btn:active,
+  .settings-weekday:active,
+  .settings-reset-btn:active,
+  .btn-primary:active,
+  .btn-secondary:active,
+  .btn-delete:active {
+    transform: none;
+  }
 }

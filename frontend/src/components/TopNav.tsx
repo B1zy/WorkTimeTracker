@@ -3,10 +3,12 @@ export type AppView = "week" | "overview";
 interface TopNavProps {
   view: AppView;
   onChangeView: (view: AppView) => void;
-  onOpenSettings: () => void;
 }
 
-export function TopNav({ view, onChangeView, onOpenSettings }: TopNavProps) {
+// Settings now live inline at the bottom of the Overview tab (see
+// OverviewView) rather than behind a modal, so there's no separate settings
+// trigger here anymore -- "Overview" doubles as the way in.
+export function TopNav({ view, onChangeView }: TopNavProps) {
   return (
     <div className="top-nav">
       <div className="top-nav-tabs">
@@ -25,9 +27,6 @@ export function TopNav({ view, onChangeView, onOpenSettings }: TopNavProps) {
           Overview
         </button>
       </div>
-      <button type="button" className="top-nav-settings-btn" aria-label="Settings" title="Settings" onClick={onOpenSettings}>
-        &#9881;
-      </button>
     </div>
   );
 }
