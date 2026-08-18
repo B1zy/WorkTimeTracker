@@ -1,5 +1,7 @@
 export type WorkLocation = "Remote" | "InOffice" | "Other";
 
+export type EntryType = "Working" | "Sick" | "OvertimeCompensation" | "Appointment" | "Lunch";
+
 // `date` is "YYYY-MM-DD", `start`/`end` are "HH:MM:SS" (matching the
 // backend's DateOnly/TimeOnly serialization).
 export interface WorkSession {
@@ -7,6 +9,7 @@ export interface WorkSession {
   name: string;
   description: string;
   location: WorkLocation;
+  entryType: EntryType;
   date: string;
   start: string;
   end: string;

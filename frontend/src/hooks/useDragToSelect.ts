@@ -4,13 +4,15 @@
 
 import { useCallback, type MouseEvent as ReactMouseEvent, type RefObject } from "react";
 import { formatTimeShort } from "../utils/dateUtils";
-import { DAY_RANGE_MIN, DAY_START_MIN, minsToTimeStr, snapMinutesTo5 } from "../utils/timelineLayout";
+import { minsToTimeStr, snapMinutesTo5 } from "../utils/timelineLayout";
 import { useDragTooltip } from "./useDragTooltip";
 
 export function useDragToSelect(
   trackRef: RefObject<HTMLDivElement | null>,
   ghostRef: RefObject<HTMLDivElement | null>,
-  onTrackClick: (startTime: string, endTime: string | null) => void
+  onTrackClick: (startTime: string, endTime: string | null) => void,
+  rangeStartMin: number,
+  rangeEndMin: number
 ) {
   const { showTooltip, hideTooltip } = useDragTooltip();
 
@@ -24,10 +26,13 @@ export function useDragToSelect(
     [trackRef]
   );
 
-  const minsFromFraction = useCallback((fraction: number, snap: boolean): number => {
-    const raw = fraction * DAY_RANGE_MIN + DAY_START_MIN;
-    return snap ? snapMinutesTo5(raw) : Math.round(raw);
-  }, []);
+  const minsFromFraction = useCallback(
+    (fraction: number, snap: boolean): number => {
+      const raw = fraction * (rangeEndMin - rangeStartMin) + rangeStartMin;
+      return snap ? snapMinutesTo5(raw) : Math.round(raw);
+    },
+    [rangeStartMin, rangeEndMin]
+  );
 
   const onMouseDown = useCallback(
     (event: ReactMouseEvent<HTMLDivElement>) => {

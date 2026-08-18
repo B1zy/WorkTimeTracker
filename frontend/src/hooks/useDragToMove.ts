@@ -5,7 +5,7 @@
 import { useCallback, useRef, type MouseEvent as ReactMouseEvent, type RefObject } from "react";
 import type { WorkSession } from "../types/WorkSession";
 import { formatTimeShort } from "../utils/dateUtils";
-import { DAY_END_MIN, DAY_RANGE_MIN, DAY_START_MIN, minsToTimeStr, minutesToPercent } from "../utils/timelineLayout";
+import { minsToTimeStr, minutesToPercent } from "../utils/timelineLayout";
 import { useDragTooltip } from "./useDragTooltip";
 
 // Minimum pointer movement (px) before a mousedown on a session block counts
@@ -19,6 +19,8 @@ interface UseDragToMoveOptions {
   startMins: number;
   endMins: number;
   leftPercent: number;
+  rangeStartMin: number;
+  rangeEndMin: number;
   onSessionClick: (session: WorkSession) => void;
   onSessionMove: (session: WorkSession, newStart: string, newEnd: string) => Promise<boolean>;
 }
@@ -30,6 +32,8 @@ export function useDragToMove({
   startMins,
   endMins,
   leftPercent,
+  rangeStartMin,
+  rangeEndMin,
   onSessionClick,
   onSessionMove,
 }: UseDragToMoveOptions) {
@@ -56,14 +60,14 @@ export function useDragToMove({
         const track = trackRef.current;
         if (!track || !block) return;
         const rect = track.getBoundingClientRect();
-        const deltaMins = (deltaX / rect.width) * DAY_RANGE_MIN;
+        const deltaMins = (deltaX / rect.width) * (rangeEndMin - rangeStartMin);
         let newStart = Math.round(startMins + deltaMins);
-        newStart = Math.min(Math.max(newStart, DAY_START_MIN), DAY_END_MIN - blockDuration);
+        newStart = Math.min(Math.max(newStart, rangeStartMin), rangeEndMin - blockDuration);
         const newEnd = newStart + blockDuration;
         pendingStart = newStart;
         pendingEnd = newEnd;
 
-        block.style.left = `${minutesToPercent(newStart)}%`;
+        block.style.left = `${minutesToPercent(newStart, rangeStartMin, rangeEndMin)}%`;
         block.classList.add("timeline-block-dragging");
         showTooltip(
           `${formatTimeShort(minsToTimeStr(newStart))} – ${formatTimeShort(minsToTimeStr(newEnd))}`,
@@ -100,6 +104,8 @@ export function useDragToMove({
       endMins,
       blockDuration,
       leftPercent,
+      rangeStartMin,
+      rangeEndMin,
       onSessionMove,
       showTooltip,
       hideTooltip,

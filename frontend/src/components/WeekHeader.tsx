@@ -1,3 +1,4 @@
+import { useSettings } from "../contexts/SettingsContext";
 import { formatDuration } from "../utils/dateUtils";
 import type { SummaryState } from "../utils/weekSummary";
 import { WeekNav } from "./WeekNav";
@@ -33,6 +34,8 @@ export function WeekHeader({
   correctionMinutes,
   onCorrectionChange,
 }: WeekHeaderProps) {
+  const { settings } = useSettings();
+
   return (
     <header className="week-header">
       <WeekNav
@@ -46,7 +49,7 @@ export function WeekHeader({
       <div className="week-summary">
         <div className="summary-hours">
           <span className="summary-total">{formatDuration(adjustedMinutes)}</span>
-          <span className="summary-target">/ 42h target</span>
+          <span className="summary-target">/ {formatDuration(settings.weeklyTargetMinutes)} target</span>
         </div>
 
         {/* Console-lamp status indicator: a glowing dot + colored label. */}

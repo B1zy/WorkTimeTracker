@@ -1,35 +1,45 @@
-import { MAJOR_HOURS, MINOR_HOURS, minutesToPercent } from "../utils/timelineLayout";
+import { generateAxisTicks, minutesToPercent } from "../utils/timelineLayout";
 
-// Ruler-style axis: major ticks (labeled, every 6h) are taller and brighter
-// than the minor ticks (every 3h), like a physical measuring instrument.
-export function TimelineAxis() {
+interface TimelineAxisProps {
+  rangeStartMin: number;
+  rangeEndMin: number;
+}
+
+// Ruler-style axis: major ticks (labeled, ~4 across the visible range) are
+// taller and brighter than the minor ticks (at each major segment's
+// midpoint), like a physical measuring instrument.
+export function TimelineAxis({ rangeStartMin, rangeEndMin }: TimelineAxisProps) {
+  const { majorMins, minorMins } = generateAxisTicks(rangeStartMin, rangeEndMin);
+
   return (
     <div className="timeline-axis">
-      {MINOR_HOURS.map((hour) => (
+      {minorMins.map((mins) => (
         <span
-          key={`minor-${hour}`}
+          key={`minor-${mins}`}
           className="axis-tick axis-tick-minor"
-          style={{ left: `${minutesToPercent(hour * 60)}%` }}
+          style={{ left: `${minutesToPercent(mins, rangeStartMin, rangeEndMin)}%` }}
         />
       ))}
-      {MAJOR_HOURS.map((hour) => {
-        // "24:00" (rather than wrapping to "00:00") so the ruler's end
-        // doesn't look like a second copy of its start.
+      {majorMins.map((mins) => {
+        // The very first/last tick get their label anchored inward instead
+        // of centered, so it can't spill outside the track.
         const labelClass = [
           "axis-tick-label",
-          hour === 0 ? "axis-tick-label-start" : null,
-          hour === 24 ? "axis-tick-label-end" : null,
+          mins === rangeStartMin ? "axis-tick-label-start" : null,
+          mins === rangeEndMin ? "axis-tick-label-end" : null,
         ]
           .filter(Boolean)
           .join(" ");
 
         return (
           <span
-            key={`major-${hour}`}
+            key={`major-${mins}`}
             className="axis-tick axis-tick-major"
-            style={{ left: `${minutesToPercent(hour * 60)}%` }}
+            style={{ left: `${minutesToPercent(mins, rangeStartMin, rangeEndMin)}%` }}
           >
-            <span className={labelClass}>{String(hour).padStart(2, "0")}:00</span>
+            <span className={labelClass}>
+              {String(Math.floor(mins / 60)).padStart(2, "0")}:{String(mins % 60).padStart(2, "0")}
+            </span>
           </span>
         );
       })}

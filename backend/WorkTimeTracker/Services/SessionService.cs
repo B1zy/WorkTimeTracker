@@ -47,6 +47,7 @@ public class SessionService : ISessionService
         existing.Name = session.Name;
         existing.Description = session.Description;
         existing.Location = session.Location;
+        existing.EntryType = session.EntryType;
         existing.Date = session.Date;
         existing.Start = session.Start;
         existing.End = session.End;
