@@ -977,6 +977,134 @@ select:focus {
   height: 11px;
 }
 
+/* --- Overview: weekly-hours + by-weekday charts --- */
+
+.overview-section-title {
+  font-family: var(--font-display);
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-secondary);
+  margin: 0 0 8px;
+}
+.overview-section-title-spaced {
+  margin-top: 20px;
+}
+
+/* Shares .overview-chart-scroll's grid columns with the heatmap directly
+   below it, so the two are pixel-aligned -- one continuous trend view. */
+.overview-week-chart-wrap {
+  position: relative;
+  margin-bottom: 6px;
+}
+.overview-target-line {
+  position: absolute;
+  left: 0;
+  right: 0;
+  border-top: 1px dashed var(--border-strong);
+}
+.overview-week-chart {
+  display: grid;
+  grid-auto-flow: column;
+  grid-template-rows: 56px;
+  gap: 3px;
+  position: relative;
+}
+.overview-bar {
+  display: flex;
+  align-items: flex-end;
+  height: 100%;
+}
+.overview-bar-fill {
+  width: 100%;
+  min-height: 2px;
+  border-radius: 2px 2px 0 0;
+  background: var(--border-strong);
+}
+.overview-bar-fill.state-target { background: var(--state-target); }
+.overview-bar-fill.state-under { background: var(--state-under); }
+.overview-bar-fill.state-over { background: var(--state-over); }
+
+.overview-weekday-chart {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-width: 480px;
+}
+
+.overview-weekday-row {
+  display: grid;
+  grid-template-columns: 34px 1fr 52px;
+  align-items: center;
+  gap: 10px;
+}
+
+.overview-weekday-label {
+  font-family: var(--font-display);
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: var(--text-dim);
+  letter-spacing: 0.04em;
+}
+
+.overview-weekday-track {
+  position: relative;
+  height: 10px;
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.overview-weekday-fill {
+  height: 100%;
+  min-width: 2px;
+  background: var(--border-strong);
+  transition: width 0.25s ease;
+}
+.overview-weekday-fill.state-target { background: var(--state-target); }
+.overview-weekday-fill.state-under { background: var(--state-under); }
+.overview-weekday-fill.state-over { background: var(--state-over); }
+
+.overview-weekday-target-tick {
+  position: absolute;
+  top: -1px;
+  bottom: -1px;
+  width: 1px;
+  background: var(--text-dim);
+  z-index: 1;
+}
+
+.overview-weekday-value {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-secondary);
+  text-align: right;
+}
+
+.overview-state-legend {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 14px;
+  font-size: 0.7rem;
+  color: var(--text-dim);
+}
+.overview-state-chip {
+  width: 9px;
+  height: 9px;
+  border-radius: 2px;
+  margin-left: 8px;
+}
+.overview-state-chip:first-child {
+  margin-left: 0;
+}
+.overview-state-chip.state-target { background: var(--state-target); }
+.overview-state-chip.state-under { background: var(--state-under); }
+.overview-state-chip.state-over { background: var(--state-over); }
+
 /* --- Top nav (view tabs + settings) --- */
 
 .top-nav {
@@ -1022,7 +1150,7 @@ select:focus {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
-  padding: 20px 24px;
+  padding: 16px 20px;
   margin-top: 16px;
 }
 #settings-title {
@@ -1032,21 +1160,36 @@ select:focus {
   letter-spacing: 0.01em;
 }
 
-.settings-section {
-  margin-top: 20px;
-  padding-top: 16px;
-  border-top: 1px solid var(--border);
-}
-.settings-section:first-of-type {
+/* Condensed into a masonry of self-contained cards instead of a single
+   stacked column with divider rules -- the point is to fit the whole
+   settings surface on screen without scrolling past it. A CSS grid would
+   equalize each row to its tallest card (leaving short cards mostly empty);
+   multi-column packs each card into the shortest column instead, so there's
+   no dead space regardless of how uneven the cards' content lengths are.
+   "3 280px" auto-drops to 2 or 1 column on a narrower viewport. */
+.settings-grid {
+  columns: 3 280px;
+  column-gap: 12px;
   margin-top: 16px;
+}
+
+.settings-section {
+  break-inside: avoid;
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 12px 14px;
+  margin-bottom: 12px;
 }
 
 .settings-section-title {
   font-family: var(--font-display);
-  font-size: 0.85rem;
+  font-size: 0.72rem;
   font-weight: 700;
-  letter-spacing: 0.02em;
-  margin: 0 0 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--text-secondary);
+  margin: 0 0 8px;
 }
 
 .settings-section-heading-row {
@@ -1060,9 +1203,17 @@ select:focus {
 }
 
 .settings-hint {
-  margin: 8px 0 0;
-  font-size: 0.78rem;
+  margin: 6px 0 0;
+  font-size: 0.68rem;
+  line-height: 1.4;
   color: var(--text-dim);
+}
+
+.settings-section .form-row {
+  margin-bottom: 8px;
+}
+.settings-section .form-row:last-child {
+  margin-bottom: 0;
 }
 
 .settings-reset-btn {
@@ -1086,7 +1237,7 @@ select:focus {
 .settings-color-grid {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
 }
 
 /* Work-day pickers: compact toggle chips rather than a stack of checkboxes,
@@ -1100,10 +1251,10 @@ select:focus {
 .settings-weekday {
   display: flex;
   align-items: center;
-  gap: 4px;
-  padding: 5px 8px;
+  gap: 3px;
+  padding: 4px 6px;
   font-family: var(--font-display);
-  font-size: 0.72rem;
+  font-size: 0.66rem;
   font-weight: 700;
   border: 1px solid var(--border-strong);
   border-radius: var(--radius);
@@ -1131,22 +1282,25 @@ select:focus {
 .settings-counting-grid {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
 }
 
 .settings-counting-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
-  font-size: 0.85rem;
+  flex-wrap: wrap;
+  row-gap: 3px;
+  column-gap: 8px;
+  font-size: 0.78rem;
   color: var(--text-primary);
 }
 .settings-counting-row select {
-  flex-shrink: 0;
-  min-width: 170px;
-  font-size: 0.8rem;
-  padding: 4px 6px;
+  flex: 1 1 120px;
+  min-width: 0;
+  max-width: 100%;
+  font-size: 0.74rem;
+  padding: 3px 5px;
 }
 .settings-counting-row select:disabled {
   opacity: 0.55;
@@ -1157,23 +1311,26 @@ select:focus {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
-  font-size: 0.85rem;
+  gap: 10px;
+  font-size: 0.78rem;
   color: var(--text-primary);
 }
 .settings-color-row input[type="color"] {
-  width: 40px;
-  height: 28px;
-  padding: 2px;
+  width: 32px;
+  height: 22px;
+  padding: 1px;
   cursor: pointer;
 }
 
 .settings-backup-actions {
   display: flex;
-  gap: 8px;
+  gap: 6px;
+  margin-bottom: 6px;
 }
 .settings-backup-actions .btn-secondary {
   flex: 1;
+  padding: 6px 8px;
+  font-size: 0.72rem;
 }
 
 .settings-backup-status {
@@ -1182,6 +1339,8 @@ select:focus {
 
 .settings-clear-btn {
   width: 100%;
+  padding: 6px 8px;
+  font-size: 0.72rem;
 }
 .settings-clear-btn.is-confirming {
   background: var(--state-over);
@@ -1189,7 +1348,9 @@ select:focus {
 }
 .settings-clear-cancel {
   width: 100%;
-  margin-top: 8px;
+  margin-top: 6px;
+  padding: 6px 8px;
+  font-size: 0.72rem;
 }
 
 /* --- Correction widget --- */

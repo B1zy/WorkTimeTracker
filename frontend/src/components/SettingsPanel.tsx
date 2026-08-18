@@ -134,6 +134,7 @@ export function SettingsPanel({ onClearAllData, onExportData, onImportData }: Se
     <section className="settings-inline">
       <h2 id="settings-title">Settings</h2>
 
+      <div className="settings-grid">
       <section className="settings-section">
         <h3 className="settings-section-title">Weekly target</h3>
         <div className="form-row">
@@ -274,7 +275,7 @@ export function SettingsPanel({ onClearAllData, onExportData, onImportData }: Se
       </section>
 
       <section className="settings-section">
-        <h3 className="settings-section-title">Backup</h3>
+        <h3 className="settings-section-title">Data &amp; backup</h3>
         <div className="settings-backup-actions">
           <button type="button" className="btn-secondary" onClick={handleExport} disabled={busy}>
             Export backup
@@ -285,7 +286,7 @@ export function SettingsPanel({ onClearAllData, onExportData, onImportData }: Se
             onClick={() => fileInputRef.current?.click()}
             disabled={busy}
           >
-            Restore from backup…
+            Restore…
           </button>
         </div>
         <input
@@ -296,14 +297,6 @@ export function SettingsPanel({ onClearAllData, onExportData, onImportData }: Se
           onChange={handleFileChosen}
         />
         {status && <p className="settings-hint settings-backup-status">{status}</p>}
-        <p className="settings-hint">
-          Includes your entries, settings and weekly corrections. Restoring replaces everything — a copy of your current
-          data is downloaded first.
-        </p>
-      </section>
-
-      <section className="settings-section">
-        <h3 className="settings-section-title">Data</h3>
         <button
           type="button"
           className={`btn-delete settings-clear-btn${confirmingClear ? " is-confirming" : ""}`}
@@ -317,8 +310,12 @@ export function SettingsPanel({ onClearAllData, onExportData, onImportData }: Se
             Cancel
           </button>
         )}
+        <p className="settings-hint">
+          Backup includes your entries, settings and corrections. Restoring replaces everything — a copy of your
+          current data is downloaded first.
+        </p>
       </section>
-
+      </div>
     </section>
   );
 }

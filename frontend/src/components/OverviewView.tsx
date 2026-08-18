@@ -3,18 +3,21 @@ import { useSettings } from "../contexts/SettingsContext";
 import { useOverviewData } from "../hooks/useOverviewData";
 import { buildCalendarYearWeeks } from "../utils/calendar";
 import { formatDuration, getMonday, toISODate } from "../utils/dateUtils";
-import { workdayCount, workdayOffsets } from "../utils/workweek";
-import { dayTargetMinutes } from "../utils/weekSummary";
+import { WEEKDAY_LABEL, workdayCount, workdayOffsets, type Weekday } from "../utils/workweek";
+import { classifySummaryState, dayTargetMinutes, meterMaxMinutes } from "../utils/weekSummary";
 import { SettingsPanel } from "./SettingsPanel";
 
+// Levels 1-4 scale linearly from 0h up to the daily target (100%); level 5 is
+// reserved for days that beat the target by a full hour or more, so "hit your
+// goal" and "blew past it" read as visibly different intensities.
 function intensityClass(minutes: number, dayTarget: number): string {
   if (minutes <= 0) return "level-0";
+  if (minutes >= dayTarget + 60) return "level-5";
   const ratio = minutes / dayTarget;
-  if (ratio < 0.25) return "level-1";
-  if (ratio < 0.5) return "level-2";
-  if (ratio < 0.85) return "level-3";
-  if (ratio <= 1.15) return "level-4";
-  return "level-5";
+  if (ratio <= 0.25) return "level-1";
+  if (ratio <= 0.5) return "level-2";
+  if (ratio <= 0.75) return "level-3";
+  return "level-4";
 }
 
 function formatSignedDuration(minutes: number): string {
@@ -107,6 +110,50 @@ export function OverviewView({ onClearAllData, onExportData, onImportData }: Ove
     return labels;
   }, [weeks, year]);
 
+  // Weekly-hours bar chart: same column grid as the heatmap below it (so the
+  // two read as one aligned trend view), scaled with the same headroom ratio
+  // as the This Week gauge. A week with no entries gets a neutral bar rather
+  // than being colored "way off target" -- it likely just hasn't happened yet.
+  const weekMax = meterMaxMinutes(weekTarget);
+  const weekBars = useMemo(
+    () =>
+      weekTotals.map((minutes, i) => ({
+        key: toISODate(weeks[i][0]),
+        heightPercent: Math.min((Math.abs(minutes) / weekMax) * 100, 100),
+        state: minutes !== 0 ? classifySummaryState(minutes, weekTarget) : null,
+        tooltip: `Week of ${weeks[i][0].toLocaleDateString(undefined, { month: "short", day: "numeric" })} — ${
+          minutes !== 0 ? formatDuration(minutes) : "No entries"
+        }`,
+      })),
+    [weekTotals, weeks, weekMax, weekTarget]
+  );
+  const weekTargetLinePercent = Math.min((weekTarget / weekMax) * 100, 100);
+
+  // By-weekday averages: for each active weekday, the mean of its tracked
+  // days across the whole year -- answers "which days do I actually work
+  // more/less", which the calendar heatmap can't show at a glance.
+  const weekdayBars = useMemo(() => {
+    const rowWeekdays = offsets.map((offset) => ((offset + 1) % 7) as Weekday);
+    const sums = rowWeekdays.map(() => 0);
+    const counts = rowWeekdays.map(() => 0);
+    weeks.forEach((week) => {
+      week.forEach((day, rowIndex) => {
+        const minutes = minutesByDate[toISODate(day)];
+        if (minutes) {
+          sums[rowIndex] += minutes;
+          counts[rowIndex]++;
+        }
+      });
+    });
+    return rowWeekdays.map((weekday, i) => ({
+      weekday,
+      tracked: counts[i] > 0,
+      average: counts[i] > 0 ? sums[i] / counts[i] : 0,
+    }));
+  }, [weeks, minutesByDate, offsets]);
+  const weekdayMax = Math.max(dayTarget * 1.05, ...weekdayBars.map((w) => w.average));
+  const weekdayTargetLinePercent = Math.min((dayTarget / weekdayMax) * 100, 100);
+
   return (
     <>
       <main className="overview">
@@ -133,6 +180,7 @@ export function OverviewView({ onClearAllData, onExportData, onImportData }: Ove
 
         {error && <div className="error">{error}</div>}
 
+        <h3 className="overview-section-title">Weekly hours</h3>
         <div className="overview-chart-scroll">
           <div className="overview-chart">
             <div className="overview-month-row" style={columnStyle}>
@@ -141,6 +189,19 @@ export function OverviewView({ onClearAllData, onExportData, onImportData }: Ove
                   {label}
                 </span>
               ))}
+            </div>
+            <div className="overview-week-chart-wrap">
+              <div className="overview-target-line" style={{ bottom: `${weekTargetLinePercent}%` }} />
+              <div className="overview-week-chart" style={columnStyle}>
+                {weekBars.map((bar) => (
+                  <div key={bar.key} className="overview-bar" title={bar.tooltip}>
+                    <div
+                      className={`overview-bar-fill${bar.state ? ` state-${bar.state}` : ""}`}
+                      style={{ height: `${bar.heightPercent}%` }}
+                    />
+                  </div>
+                ))}
+              </div>
             </div>
             <div className="overview-grid" style={gridStyle} aria-hidden={loading}>
               {weeks.map((week, weekIndex) =>
@@ -173,6 +234,32 @@ export function OverviewView({ onClearAllData, onExportData, onImportData }: Ove
           <span className="overview-cell level-4" />
           <span className="overview-cell level-5" />
           <span>More</span>
+        </div>
+
+        <h3 className="overview-section-title overview-section-title-spaced">Average by weekday</h3>
+        <div className="overview-weekday-chart">
+          {weekdayBars.map(({ weekday, tracked, average }) => (
+            <div key={weekday} className="overview-weekday-row">
+              <span className="overview-weekday-label">{WEEKDAY_LABEL[weekday]}</span>
+              <div className="overview-weekday-track">
+                <div className="overview-weekday-target-tick" style={{ left: `${weekdayTargetLinePercent}%` }} />
+                <div
+                  className={`overview-weekday-fill${tracked ? ` state-${classifySummaryState(average, dayTarget)}` : ""}`}
+                  style={{ width: `${Math.min((average / weekdayMax) * 100, 100)}%` }}
+                />
+              </div>
+              <span className="overview-weekday-value">{tracked ? formatDuration(average) : "—"}</span>
+            </div>
+          ))}
+        </div>
+
+        <div className="overview-state-legend">
+          <span className="overview-state-chip state-target" />
+          On target
+          <span className="overview-state-chip state-under" />
+          Off pace
+          <span className="overview-state-chip state-over" />
+          Way off
         </div>
       </main>
 
