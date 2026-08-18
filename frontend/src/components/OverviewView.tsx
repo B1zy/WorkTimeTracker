@@ -6,6 +6,7 @@ import { formatDuration, getMonday, toISODate } from "../utils/dateUtils";
 import { WEEKDAY_LABEL, workdayCount, workdayOffsets, type Weekday } from "../utils/workweek";
 import { classifySummaryState, dayTargetMinutes, meterMaxMinutes } from "../utils/weekSummary";
 import { SettingsPanel } from "./SettingsPanel";
+import { SettingsSidebar } from "./SettingsSidebar";
 
 // Levels 1-4 scale linearly from 0h up to the daily target (100%); level 5 is
 // reserved for days that beat the target by a full hour or more, so "hit your
@@ -24,6 +25,8 @@ function formatSignedDuration(minutes: number): string {
   const sign = minutes > 0 ? "+" : minutes < 0 ? "-" : "";
   return `${sign}${formatDuration(Math.abs(minutes))}`;
 }
+
+const RECENT_WEEK_COUNT = 13;
 
 interface OverviewViewProps {
   onClearAllData: () => Promise<void>;
@@ -44,12 +47,17 @@ export function OverviewView({ onClearAllData, onExportData, onImportData }: Ove
   const offsets = useMemo(() => workdayOffsets(settings.workdays), [settings.workdays]);
   const weeks = useMemo(() => buildCalendarYearWeeks(year, offsets), [year, offsets]);
   // Both axes are driven from the data: columns = weeks in the year, rows =
-  // active work days. Cells are a fixed 11px (matching .overview-cell / the
-  // legend swatches) -- the static repeat(5, 11px) / repeat(52, 11px) in
-  // index.css is only a fallback for before this first render.
-  const columnStyle = useMemo(() => ({ gridTemplateColumns: `repeat(${weeks.length}, 11px)` }), [weeks.length]);
+  // active work days. Columns are fluid (not a fixed px size) so the whole
+  // grid always exactly fits its container width -- no horizontal scrollbar
+  // regardless of how much room the settings sidebar leaves it. Rows are
+  // "auto": each cell's aspect-ratio (in index.css) derives its height from
+  // its own fluid column width, which is what keeps the cells square.
+  const columnStyle = useMemo(
+    () => ({ gridTemplateColumns: `repeat(${weeks.length}, minmax(3px, 1fr))` }),
+    [weeks.length]
+  );
   const gridStyle = useMemo(
-    () => ({ ...columnStyle, gridTemplateRows: `repeat(${offsets.length}, 11px)` }),
+    () => ({ ...columnStyle, gridTemplateRows: `repeat(${offsets.length}, auto)` }),
     [columnStyle, offsets.length]
   );
   const startIso = toISODate(weeks[0][0]);
@@ -154,8 +162,39 @@ export function OverviewView({ onClearAllData, onExportData, onImportData }: Ove
   const weekdayMax = Math.max(dayTarget * 1.05, ...weekdayBars.map((w) => w.average));
   const weekdayTargetLinePercent = Math.min((dayTarget / weekdayMax) * 100, 100);
 
+  // Recent-weeks line chart: the bar chart above already covers the full
+  // year, so this is deliberately just the last quarter -- a line reads
+  // trend/direction better than bars at a glance, which is the point of
+  // having both. Ends at the current week (or the year's last tracked week,
+  // for a moment right at a year boundary).
+  const recentWeeks = useMemo(() => {
+    const endIndex = currentWeekIndex >= 0 ? currentWeekIndex : weekTotals.length - 1;
+    const startIndex = Math.max(0, endIndex - RECENT_WEEK_COUNT + 1);
+    return weekTotals.slice(startIndex, endIndex + 1).map((minutes, i) => ({
+      weekStart: weeks[startIndex + i][0],
+      minutes,
+    }));
+  }, [weekTotals, weeks, currentWeekIndex]);
+
+  const lineChartWidth = 220;
+  const lineChartHeight = 56;
+  const linePoints = useMemo(() => {
+    const n = recentWeeks.length;
+    return recentWeeks.map(({ weekStart, minutes }, i) => ({
+      x: n > 1 ? (i / (n - 1)) * lineChartWidth : lineChartWidth / 2,
+      y: lineChartHeight - Math.min(Math.abs(minutes) / weekMax, 1) * lineChartHeight,
+      state: minutes !== 0 ? classifySummaryState(minutes, weekTarget) : null,
+      tooltip: `Week of ${weekStart.toLocaleDateString(undefined, { month: "short", day: "numeric" })} — ${
+        minutes !== 0 ? formatDuration(minutes) : "No entries"
+      }`,
+    }));
+  }, [recentWeeks, weekMax, weekTarget]);
+  const linePath = linePoints.map((p, i) => `${i === 0 ? "M" : "L"}${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(" ");
+  const lineTargetY = lineChartHeight - Math.min(weekTarget / weekMax, 1) * lineChartHeight;
+
   return (
-    <>
+    <div className="overview-page">
+      <div className="overview-page-top">
       <main className="overview">
         <div className="overview-stats">
           <div className="overview-stat">
@@ -236,21 +275,58 @@ export function OverviewView({ onClearAllData, onExportData, onImportData }: Ove
           <span>More</span>
         </div>
 
-        <h3 className="overview-section-title overview-section-title-spaced">Average by weekday</h3>
-        <div className="overview-weekday-chart">
-          {weekdayBars.map(({ weekday, tracked, average }) => (
-            <div key={weekday} className="overview-weekday-row">
-              <span className="overview-weekday-label">{WEEKDAY_LABEL[weekday]}</span>
-              <div className="overview-weekday-track">
-                <div className="overview-weekday-target-tick" style={{ left: `${weekdayTargetLinePercent}%` }} />
-                <div
-                  className={`overview-weekday-fill${tracked ? ` state-${classifySummaryState(average, dayTarget)}` : ""}`}
-                  style={{ width: `${Math.min((average / weekdayMax) * 100, 100)}%` }}
-                />
-              </div>
-              <span className="overview-weekday-value">{tracked ? formatDuration(average) : "—"}</span>
+        <div className="overview-secondary-charts">
+          <div className="overview-secondary-chart">
+            <h3 className="overview-section-title overview-section-title-spaced">Average by weekday</h3>
+            <div className="overview-weekday-chart">
+              {weekdayBars.map(({ weekday, tracked, average }) => (
+                <div key={weekday} className="overview-weekday-row">
+                  <span className="overview-weekday-label">{WEEKDAY_LABEL[weekday]}</span>
+                  <div className="overview-weekday-track">
+                    <div className="overview-weekday-target-tick" style={{ left: `${weekdayTargetLinePercent}%` }} />
+                    <div
+                      className={`overview-weekday-fill${tracked ? ` state-${classifySummaryState(average, dayTarget)}` : ""}`}
+                      style={{ width: `${Math.min((average / weekdayMax) * 100, 100)}%` }}
+                    />
+                  </div>
+                  <span className="overview-weekday-value">{tracked ? formatDuration(average) : "—"}</span>
+                </div>
+              ))}
             </div>
-          ))}
+          </div>
+
+          <div className="overview-secondary-chart overview-line-chart-col">
+            <h3 className="overview-section-title overview-section-title-spaced">
+              Last {recentWeeks.length} weeks
+            </h3>
+            <svg
+              className="overview-line-chart"
+              viewBox={`0 0 ${lineChartWidth} ${lineChartHeight}`}
+              preserveAspectRatio="none"
+              role="img"
+              aria-label={`Hours per week over the last ${recentWeeks.length} weeks`}
+            >
+              <line
+                className="overview-line-target"
+                x1={0}
+                x2={lineChartWidth}
+                y1={lineTargetY}
+                y2={lineTargetY}
+              />
+              {linePoints.length > 1 && <path className="overview-line-path" d={linePath} />}
+              {linePoints.map((p, i) => (
+                <circle
+                  key={recentWeeks[i].weekStart.toISOString()}
+                  className={`overview-line-dot${p.state ? ` state-${p.state}` : ""}`}
+                  cx={p.x}
+                  cy={p.y}
+                  r={2.6}
+                >
+                  <title>{p.tooltip}</title>
+                </circle>
+              ))}
+            </svg>
+          </div>
         </div>
 
         <div className="overview-state-legend">
@@ -263,7 +339,10 @@ export function OverviewView({ onClearAllData, onExportData, onImportData }: Ove
         </div>
       </main>
 
+      <SettingsSidebar />
+      </div>
+
       <SettingsPanel onClearAllData={onClearAllData} onExportData={onExportData} onImportData={onImportData} />
-    </>
+    </div>
   );
 }

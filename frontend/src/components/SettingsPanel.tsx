@@ -1,13 +1,6 @@
 import { useRef, useState, type ChangeEvent } from "react";
 import { useSettings } from "../contexts/SettingsContext";
 import {
-  COLOR_LABEL,
-  DEFAULT_COLORS,
-  ENTRY_TYPE_COLOR_KEYS,
-  LOCATION_COLOR_KEYS,
-  type SettingsColors,
-} from "../utils/settings";
-import {
   COUNTING_MODES,
   COUNTING_MODE_LABEL,
   type CountingMode,
@@ -106,14 +99,6 @@ export function SettingsPanel({ onClearAllData, onExportData, onImportData }: Se
       if (next.length === 0) return prev;
       return { ...prev, workdays: WEEKDAY_DISPLAY_ORDER.filter((d) => next.includes(d)) };
     });
-  }
-
-  function handleColorChange(key: keyof SettingsColors, value: string) {
-    updateSettings((prev) => ({ ...prev, colors: { ...prev.colors, [key]: value } }));
-  }
-
-  function handleResetColors() {
-    updateSettings((prev) => ({ ...prev, colors: { ...DEFAULT_COLORS } }));
   }
 
   async function handleClearAllData() {
@@ -235,43 +220,6 @@ export function SettingsPanel({ onClearAllData, onExportData, onImportData }: Se
           </div>
         </div>
         <p className="settings-hint">What each day's timebar shows and how far you can drag or resize a block.</p>
-      </section>
-
-      <section className="settings-section">
-        <div className="settings-section-heading-row">
-          <h3 className="settings-section-title">Location colors</h3>
-          <button type="button" className="settings-reset-btn" onClick={handleResetColors}>
-            Reset all to default
-          </button>
-        </div>
-        <div className="settings-color-grid">
-          {LOCATION_COLOR_KEYS.map((key) => (
-            <label key={key} className="settings-color-row">
-              <span>{COLOR_LABEL[key]}</span>
-              <input
-                type="color"
-                value={settings.colors[key]}
-                onChange={(e) => handleColorChange(key, e.target.value)}
-              />
-            </label>
-          ))}
-        </div>
-      </section>
-
-      <section className="settings-section">
-        <h3 className="settings-section-title">Entry type colors</h3>
-        <div className="settings-color-grid">
-          {ENTRY_TYPE_COLOR_KEYS.map((key) => (
-            <label key={key} className="settings-color-row">
-              <span>{COLOR_LABEL[key]}</span>
-              <input
-                type="color"
-                value={settings.colors[key]}
-                onChange={(e) => handleColorChange(key, e.target.value)}
-              />
-            </label>
-          ))}
-        </div>
       </section>
 
       <section className="settings-section">

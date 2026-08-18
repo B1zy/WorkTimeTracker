@@ -878,11 +878,35 @@ select:focus {
 
 /* --- Overview (contribution-chart-style history) --- */
 
+/* L-shaped page: charts + a short color-only sidebar sit in a row on top
+   (the sidebar is capped to two short sections so it doesn't end up taller
+   than the charts), then the rest of the settings -- which would otherwise
+   make that sidebar column too tall -- flow into their own full-width row
+   below instead, using the whole page width rather than being squeezed into
+   a narrow column. That's the "bottom of the L goes left" shape. */
+.overview-page {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.overview-page-top {
+  display: flex;
+  align-items: stretch;
+  gap: 16px;
+}
+@media (max-width: 900px) {
+  .overview-page-top {
+    flex-direction: column;
+  }
+}
+
 .overview {
+  flex: 1;
+  min-width: 0;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
-  padding: 20px 24px;
+  padding: 14px 18px;
 }
 
 .overview-stats {
@@ -915,18 +939,18 @@ select:focus {
   padding-bottom: 6px;
 }
 
-/* Content-width: the grid below is fixed-size cells, so the chart is exactly
-   as wide as it needs to be. .overview-chart-scroll's overflow-x handles any
-   viewport narrower than that. */
+/* Fluid width: the grid's columns below are minmax(3px, 1fr), so the chart
+   always exactly fills its container -- no horizontal scrollbar, regardless
+   of how much room the sidebar next to it leaves. .overview-chart-scroll's
+   overflow-x is only a last-resort fallback below the 3px-per-column floor. */
 .overview-chart {
-  width: max-content;
-  max-width: 100%;
+  width: 100%;
 }
 
 .overview-month-row {
   position: relative;
   display: grid;
-  grid-template-columns: repeat(52, 11px);
+  grid-template-columns: repeat(52, minmax(3px, 1fr));
   gap: 3px;
   height: 16px;
   margin-bottom: 2px;
@@ -944,19 +968,25 @@ select:focus {
 .overview-grid {
   display: grid;
   grid-auto-flow: column;
-  grid-template-rows: repeat(5, 11px);
-  grid-template-columns: repeat(52, 11px);
+  grid-template-rows: repeat(5, auto);
+  grid-template-columns: repeat(52, minmax(3px, 1fr));
   gap: 3px;
 }
 
-/* Same fixed size for both the heatmap cells and the legend swatches below,
-   so they read as the same unit. */
+/* Fixed size for the standalone legend swatches below the grid; the grid's
+   own cells are overridden to fluid+square right after this (they need to
+   fill their column's variable width, not this fixed size). */
 .overview-cell {
   width: 11px;
   height: 11px;
   border-radius: 2px;
   background: var(--surface-raised);
   border: 1px solid var(--border);
+}
+.overview-grid .overview-cell {
+  width: auto;
+  height: auto;
+  aspect-ratio: 1;
 }
 .overview-cell.level-1 { background: color-mix(in srgb, var(--accent) 28%, var(--surface-raised)); border-color: transparent; }
 .overview-cell.level-2 { background: color-mix(in srgb, var(--accent) 52%, var(--surface-raised)); border-color: transparent; }
@@ -1026,11 +1056,61 @@ select:focus {
 .overview-bar-fill.state-under { background: var(--state-under); }
 .overview-bar-fill.state-over { background: var(--state-over); }
 
+/* The weekday chart and the recent-weeks line chart sit side by side --
+   there was empty space to the right of the (fixed-width) weekday chart, so
+   the line chart fills it rather than leaving it blank. Wraps to stacked on
+   a narrow viewport. */
+.overview-secondary-charts {
+  display: flex;
+  align-items: flex-start;
+  gap: 32px;
+  flex-wrap: wrap;
+}
+
+.overview-secondary-chart {
+  flex: 1 1 320px;
+  min-width: 0;
+}
+
+.overview-line-chart-col {
+  flex: 1 1 200px;
+  max-width: 320px;
+}
+
+.overview-line-chart {
+  display: block;
+  width: 100%;
+  height: 64px;
+  overflow: visible;
+}
+.overview-line-target {
+  stroke: var(--border-strong);
+  stroke-width: 1;
+  stroke-dasharray: 3 3;
+  vector-effect: non-scaling-stroke;
+}
+.overview-line-path {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+}
+.overview-line-dot {
+  fill: var(--border-strong);
+  stroke: var(--surface);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+.overview-line-dot.state-target { fill: var(--state-target); }
+.overview-line-dot.state-under { fill: var(--state-under); }
+.overview-line-dot.state-over { fill: var(--state-over); }
+
 .overview-weekday-chart {
   display: flex;
   flex-direction: column;
   gap: 6px;
-  max-width: 480px;
 }
 
 .overview-weekday-row {
@@ -1144,42 +1224,99 @@ select:focus {
 
 /* --- Settings panel --- */
 /* Inline on the Overview tab (not a modal): same card language as .overview
-   so the two read as one continuous page instead of a popup over the chart. */
+   so the two read as one continuous page instead of a popup over the chart.
+   Base card styling shared by both the main panel (full width, sits below
+   the charts+sidebar row) and the sidebar variant (fixed width, sits beside
+   the charts) -- see .settings-sidebar for the latter's width override. */
 
 .settings-inline {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
-  padding: 16px 20px;
-  margin-top: 16px;
+  padding: 14px 18px;
 }
-#settings-title {
+#settings-title,
+#settings-sidebar-title {
   font-family: var(--font-display);
   margin: 0;
   font-size: 1.1rem;
   letter-spacing: 0.01em;
 }
 
-/* Condensed into a masonry of self-contained cards instead of a single
-   stacked column with divider rules -- the point is to fit the whole
-   settings surface on screen without scrolling past it. A CSS grid would
-   equalize each row to its tallest card (leaving short cards mostly empty);
-   multi-column packs each card into the shortest column instead, so there's
-   no dead space regardless of how uneven the cards' content lengths are.
-   "3 280px" auto-drops to 2 or 1 column on a narrower viewport. */
+/* The sidebar variant: capped to two short (color-only) sections and a fixed
+   width, so it sits beside the charts -- the rest of the settings flow into
+   the full-width panel below instead. Stretched (via .overview-page-top's
+   align-items: stretch) to match the main panel's height, with its two
+   sections spaced out across that height instead of stacking tight at top. */
+.settings-sidebar {
+  flex: 0 0 260px;
+  display: flex;
+  flex-direction: column;
+}
+@media (max-width: 900px) {
+  .settings-sidebar {
+    flex-basis: auto;
+    width: 100%;
+  }
+}
+.settings-sidebar-title {
+  font-size: 0.95rem;
+}
+.settings-sidebar .settings-section-heading-row {
+  margin-bottom: 12px;
+}
+.settings-sidebar-sections {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+/* Each card grows to fill its share of the sidebar's (now stretched) height.
+   The content block sits slightly above dead-center -- a pair of flex-grow
+   spacers before/after it in an uneven ratio, rather than a fixed offset, so
+   the "bit up" shift holds regardless of how tall the card ends up. */
+.settings-sidebar .settings-section {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+.settings-sidebar .settings-section::before {
+  content: "";
+  flex: 1 1 0;
+}
+.settings-sidebar .settings-section::after {
+  content: "";
+  flex: 1.4 1 0;
+}
+
+/* A real grid rather than the masonry (CSS columns) this used to be: every
+   card in a row now stretches to the row's tallest, so the four cards fill
+   the whole height of the panel edge-to-edge instead of each stopping at its
+   own content. "auto-fit, minmax(240px, 1fr)" keeps all four in one row on a
+   normal desktop width and drops to 2/1 columns as it narrows. */
 .settings-grid {
-  columns: 3 280px;
-  column-gap: 12px;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 12px;
   margin-top: 16px;
+  align-items: stretch;
 }
 
 .settings-section {
-  break-inside: avoid;
   background: var(--surface-raised);
   border: 1px solid var(--border);
   border-radius: var(--radius);
   padding: 12px 14px;
-  margin-bottom: 12px;
+  display: flex;
+  flex-direction: column;
+}
+/* In the main panel (not the sidebar), a short card (Timebar range, Data &
+   backup) still gets stretched to match the row's tallest card (What counts
+   as worked time). Centering the title+content+hint as one tight block reads
+   as a balanced, deliberately-padded card; space-between was tried first but
+   split the leftover height into one big awkward gap right above the hint. */
+.settings-grid .settings-section {
+  justify-content: center;
 }
 
 .settings-section-title {
@@ -1214,6 +1351,22 @@ select:focus {
 }
 .settings-section .form-row:last-child {
   margin-bottom: 0;
+}
+
+/* Timebar range specifically: at the card widths the settings grid now uses,
+   side-by-side start/end inputs squeeze their labels into a line-break.
+   Stacking them and shrinking the label font fixes that without touching
+   .form-row-split's shared (wider) layout in SessionDialog. */
+.settings-section .form-row-split {
+  flex-direction: column;
+  gap: 8px;
+}
+.settings-section .form-row-split label {
+  font-size: 0.66rem;
+}
+.settings-section .form-row-split input {
+  padding: 10px 12px;
+  font-size: 1.1rem;
 }
 
 .settings-reset-btn {
