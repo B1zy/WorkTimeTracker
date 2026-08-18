@@ -312,15 +312,18 @@ body {
   white-space: nowrap;
 }
 .status-lamp {
-  width: 10px;
-  height: 10px;
+  width: 11px;
+  height: 11px;
   border-radius: 50%;
   background: var(--text-secondary);
 }
 .status-label {
   font-family: var(--font-display);
   font-weight: 700;
-  font-size: 0.85rem;
+  /* Deliberately a touch larger than .week-range-btn (1.05rem): this is the
+     actionable, color-coded value, so it should outrank the date range it
+     sits next to rather than read as equally weighted. */
+  font-size: 1.1rem;
   text-transform: uppercase;
   letter-spacing: 0.05em;
   color: var(--text-secondary);
@@ -441,7 +444,9 @@ body {
   font-weight: 700;
   font-size: 0.95rem;
   letter-spacing: 0.08em;
-  color: var(--text-primary);
+  /* Secondary vs. the day-total badge: same weight reads as a tag, not a
+     competing value, once it's no longer full-brightness text. */
+  color: var(--text-secondary);
 }
 .day-row-header .date {
   font-family: var(--font-mono);
@@ -688,7 +693,7 @@ body {
 .day-total {
   font-family: var(--font-mono);
   font-weight: 700;
-  font-size: 1rem;
+  font-size: 1.15rem;
   font-variant-numeric: tabular-nums;
   letter-spacing: 0.02em;
   color: var(--text-primary);
@@ -906,17 +911,18 @@ select:focus {
   padding-bottom: 6px;
 }
 
-/* Fluid width so the chart always fits its container -- columns shrink on
-   narrow viewports instead of overflowing into a scrollbar. */
+/* Content-width: the grid below is fixed-size cells, so the chart is exactly
+   as wide as it needs to be. .overview-chart-scroll's overflow-x handles any
+   viewport narrower than that. */
 .overview-chart {
-  width: 100%;
-  min-width: 320px;
+  width: max-content;
+  max-width: 100%;
 }
 
 .overview-month-row {
   position: relative;
   display: grid;
-  grid-template-columns: repeat(52, minmax(3px, 1fr));
+  grid-template-columns: repeat(52, 11px);
   gap: 3px;
   height: 16px;
   margin-bottom: 2px;
@@ -935,23 +941,18 @@ select:focus {
   display: grid;
   grid-auto-flow: column;
   grid-template-rows: repeat(5, 11px);
-  grid-template-columns: repeat(52, minmax(3px, 1fr));
+  grid-template-columns: repeat(52, 11px);
   gap: 3px;
 }
 
+/* Same fixed size for both the heatmap cells and the legend swatches below,
+   so they read as the same unit. */
 .overview-cell {
   width: 11px;
   height: 11px;
   border-radius: 2px;
   background: var(--surface-raised);
   border: 1px solid var(--border);
-}
-/* Inside the fluid grid, cells stretch to fill their (variable-width) column
-   track instead of using the fixed size above, which is only for the
-   legend swatches rendered outside the grid. */
-.overview-grid .overview-cell {
-  width: auto;
-  height: auto;
 }
 .overview-cell.level-1 { background: color-mix(in srgb, var(--accent) 28%, var(--surface-raised)); border-color: transparent; }
 .overview-cell.level-2 { background: color-mix(in srgb, var(--accent) 52%, var(--surface-raised)); border-color: transparent; }

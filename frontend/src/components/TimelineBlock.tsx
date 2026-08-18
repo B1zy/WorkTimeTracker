@@ -1,4 +1,4 @@
-import { useRef, type RefObject } from "react";
+import { useRef, type MouseEvent as ReactMouseEvent, type RefObject } from "react";
 import type { WorkSession } from "../types/WorkSession";
 import { durationMinutes, formatDuration, formatTimeShort, timeStringToMinutes } from "../utils/dateUtils";
 import {
@@ -99,6 +99,15 @@ export function TimelineBlock({
     countingMode === "ignore" ? " is-not-counted" : countingMode === "subtract" ? " is-subtracted" : "";
   const title = `${session.name} · ${typeLabel}${entryTypeClass ? "" : ` · ${LOCATION_LABEL[session.location] ?? session.location}`} · ${formatTimeShort(session.start)}–${formatTimeShort(session.end)} · ${formatDuration(durationMinutes(session.start, session.end))}`;
 
+  // A resize handle's pointerdown stops propagation so it doesn't also start
+  // a move-drag, but the browser still fires a `click` on pointerup that
+  // bubbles to the button's onClick regardless -- left unstopped, that opened
+  // the edit modal with the pre-resize `session` prop (the async resize
+  // hadn't landed yet), showing stale times. Stop it here too.
+  function stopResizeHandleClick(event: ReactMouseEvent) {
+    event.stopPropagation();
+  }
+
   return (
     <button
       ref={blockRef}
@@ -116,6 +125,7 @@ export function TimelineBlock({
       <span
         className="timeline-resize-handle timeline-resize-handle-start"
         onPointerDown={onResizeStartPointerDown}
+        onClick={stopResizeHandleClick}
         aria-hidden="true"
       />
       <span className="block-name-row">
@@ -126,6 +136,7 @@ export function TimelineBlock({
       <span
         className="timeline-resize-handle timeline-resize-handle-end"
         onPointerDown={onResizeEndPointerDown}
+        onClick={stopResizeHandleClick}
         aria-hidden="true"
       />
     </button>

@@ -31,11 +31,10 @@ export function OverviewView() {
   const offsets = useMemo(() => workdayOffsets(settings.workdays), [settings.workdays]);
   const weeks = useMemo(() => buildCalendarYearWeeks(year, offsets), [year, offsets]);
   // Both axes are driven from the data: columns = weeks in the year, rows =
-  // active work days. The static repeat(5, ...) in index.css is only a fallback.
-  const columnStyle = useMemo(
-    () => ({ gridTemplateColumns: `repeat(${weeks.length}, minmax(3px, 1fr))` }),
-    [weeks.length]
-  );
+  // active work days. Cells are a fixed 11px (matching .overview-cell / the
+  // legend swatches) -- the static repeat(5, 11px) / repeat(52, 11px) in
+  // index.css is only a fallback for before this first render.
+  const columnStyle = useMemo(() => ({ gridTemplateColumns: `repeat(${weeks.length}, 11px)` }), [weeks.length]);
   const gridStyle = useMemo(
     () => ({ ...columnStyle, gridTemplateRows: `repeat(${offsets.length}, 11px)` }),
     [columnStyle, offsets.length]
