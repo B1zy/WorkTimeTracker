@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Work Time Tracker</title>
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <div class="app">
+    <header class="week-header">
+      <div class="week-nav">
+        <button type="button" id="prev-week-btn" class="nav-btn" aria-label="Previous week">‹</button>
+        <span id="week-range-label" class="week-range-label"></span>
+        <button type="button" id="next-week-btn" class="nav-btn" aria-label="Next week">›</button>
+      </div>
+
+      <div class="week-summary">
+        <div class="summary-hours">
+          <span id="week-total-hours" class="summary-total">0h</span>
+          <span class="summary-target">/ 42h target</span>
+        </div>
+        <span id="week-status-pill" class="status-indicator">—</span>
+        <div class="summary-meter">
+          <div class="summary-bar-wrapper">
+            <div class="summary-bar-track">
+              <div id="summary-bar-fill" class="summary-bar-fill"></div>
+            </div>
+            <div id="summary-bar-target-marker" class="summary-bar-target-marker"></div>
+          </div>
+          <div class="correction-col">
+            <label for="correction-input" class="correction-label">Correction</label>
+            <div class="correction-input-wrap">
+              <input type="number" id="correction-input" class="correction-input" value="0" step="5" aria-label="Manual correction (minutes)" title="Manual correction (minutes)" />
+              <span class="correction-unit">min</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <p id="error-message" class="error" hidden></p>
+
+    <!-- Five day rows get rendered in here by timeline.js -->
+    <main id="week-rows" class="week-rows"></main>
+  </div>
+
+  <!-- Single reusable add/edit dialog, controlled by modal.js -->
+  <dialog id="session-dialog" class="session-dialog">
+    <form id="session-form">
+      <h2 id="dialog-title">Add Session</h2>
+      <p id="dialog-date-label" class="dialog-date-label"></p>
+
+      <input type="hidden" id="session-id" />
+      <input type="hidden" id="session-date" />
+
+      <div class="form-row">
+        <label for="name-input">Name</label>
+        <input type="text" id="name-input" required />
+      </div>
+
+      <div class="form-row">
+        <label for="description-input">Description</label>
+        <input type="text" id="description-input" />
+      </div>
+
+      <div class="form-row">
+        <label for="location-input">Location</label>
+        <select id="location-input">
+          <option value="Remote">Remote</option>
+          <option value="InOffice">In Office</option>
+          <option value="Other">Other</option>
+        </select>
+      </div>
+
+      <div class="form-row form-row-split">
+        <div>
+          <label for="start-input">Start</label>
+          <input type="time" id="start-input" step="1" required />
+        </div>
+        <div>
+          <label for="end-input">End</label>
+          <input type="time" id="end-input" step="1" required />
+        </div>
+      </div>
+
+      <div class="dialog-actions">
+        <button type="button" id="delete-btn" class="btn-delete" hidden>Delete</button>
+        <div class="dialog-actions-right">
+          <button type="button" id="cancel-btn" class="btn-secondary">Cancel</button>
+          <button type="submit" id="save-btn" class="btn-primary">Add Session</button>
+        </div>
+      </div>
+    </form>
+  </dialog>
+
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,118 @@
+// Drag-to-move: repositions an existing session block, preserving its
+// duration. The block's position is mutated directly via its ref during the
+// drag (not React state), matching useDragToSelect's approach.
+
+import { useCallback, useRef, type MouseEvent as ReactMouseEvent, type RefObject } from "react";
+import type { WorkSession } from "../types/WorkSession";
+import { formatTimeShort } from "../utils/dateUtils";
+import { DAY_END_MIN, DAY_RANGE_MIN, DAY_START_MIN, minsToTimeStr, minutesToPercent } from "../utils/timelineLayout";
+import { useDragTooltip } from "./useDragTooltip";
+
+// Minimum pointer movement (px) before a mousedown on a session block counts
+// as a drag-to-move rather than a plain click (which opens the edit modal).
+const MOVE_THRESHOLD_PX = 4;
+
+interface UseDragToMoveOptions {
+  trackRef: RefObject<HTMLDivElement | null>;
+  blockRef: RefObject<HTMLButtonElement | null>;
+  session: WorkSession;
+  startMins: number;
+  endMins: number;
+  leftPercent: number;
+  onSessionClick: (session: WorkSession) => void;
+  onSessionMove: (session: WorkSession, newStart: string, newEnd: string) => Promise<boolean>;
+}
+
+export function useDragToMove({
+  trackRef,
+  blockRef,
+  session,
+  startMins,
+  endMins,
+  leftPercent,
+  onSessionClick,
+  onSessionMove,
+}: UseDragToMoveOptions) {
+  const { showTooltip, hideTooltip } = useDragTooltip();
+  const blockDuration = endMins - startMins;
+  const movedRef = useRef(false);
+
+  const onMouseDown = useCallback(
+    (event: ReactMouseEvent<HTMLButtonElement>) => {
+      if (event.button !== 0) return;
+      event.preventDefault(); // prevent text-selection cursor during drag
+
+      const moveStartX = event.clientX;
+      movedRef.current = false;
+      let pendingStart = startMins;
+      let pendingEnd = endMins;
+      const block = blockRef.current;
+
+      function handleMouseMove(moveEvent: MouseEvent) {
+        const deltaX = moveEvent.clientX - moveStartX;
+        if (!movedRef.current && Math.abs(deltaX) < MOVE_THRESHOLD_PX) return;
+        movedRef.current = true;
+
+        const track = trackRef.current;
+        if (!track || !block) return;
+        const rect = track.getBoundingClientRect();
+        const deltaMins = (deltaX / rect.width) * DAY_RANGE_MIN;
+        let newStart = Math.round(startMins + deltaMins);
+        newStart = Math.min(Math.max(newStart, DAY_START_MIN), DAY_END_MIN - blockDuration);
+        const newEnd = newStart + blockDuration;
+        pendingStart = newStart;
+        pendingEnd = newEnd;
+
+        block.style.left = `${minutesToPercent(newStart)}%`;
+        block.classList.add("timeline-block-dragging");
+        showTooltip(
+          `${formatTimeShort(minsToTimeStr(newStart))} – ${formatTimeShort(minsToTimeStr(newEnd))}`,
+          moveEvent.clientX,
+          moveEvent.clientY
+        );
+      }
+
+      async function handleMouseUp() {
+        document.removeEventListener("mousemove", handleMouseMove);
+        document.removeEventListener("mouseup", handleMouseUp);
+        hideTooltip();
+        block?.classList.remove("timeline-block-dragging");
+
+        if (!movedRef.current) return; // handled as a plain click via onClick below
+
+        const ok = await onSessionMove(session, minsToTimeStr(pendingStart), minsToTimeStr(pendingEnd));
+        if (!ok && block) {
+          // Revert visually since a failed move doesn't trigger a re-render.
+          block.style.left = `${leftPercent}%`;
+          block.classList.add("timeline-block-invalid");
+          setTimeout(() => block.classList.remove("timeline-block-invalid"), 400);
+        }
+      }
+
+      document.addEventListener("mousemove", handleMouseMove);
+      document.addEventListener("mouseup", handleMouseUp);
+    },
+    [
+      trackRef,
+      blockRef,
+      session,
+      startMins,
+      endMins,
+      blockDuration,
+      leftPercent,
+      onSessionMove,
+      showTooltip,
+      hideTooltip,
+    ]
+  );
+
+  const onClick = useCallback(() => {
+    if (movedRef.current) {
+      movedRef.current = false; // consume: a drag shouldn't also open the edit modal
+      return;
+    }
+    onSessionClick(session);
+  }, [onSessionClick, session]);
+
+  return { onMouseDown, onClick };
+}

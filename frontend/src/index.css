@@ -1,0 +1,952 @@
+:root {
+  /* "Shop-Floor Time Clock" -- warm graphite, not cool navy */
+  --bg: #15120F;
+  --surface: #1F1912;
+  --surface-raised: #2A2118;
+  --border: #4A3D2C;
+  --border-strong: #6B5B42;
+
+  /* Text */
+  --text-primary: #F5EFE2;
+  --text-secondary: #B3A488;
+  --text-dim: #7C7058;
+  --text-on-accent: #15120F;
+
+  /* Location colors (timeline blocks) -- indicator-lamp family, kept
+     separate from the state colors below so the two systems never collide.
+     All drawn from the same warm orange/amber family as --accent so the
+     palette reads as one system instead of a rainbow of unrelated hues. */
+  --loc-remote: #D9A441;
+  --loc-inoffice: #FF7A33;
+  --loc-other: #D8CDB8;
+
+  /* Target-state colors (week summary only) -- amber/green/red still carry
+     traffic-light meaning, but warmed toward the same orange family. */
+  --state-under: #FFB000;
+  --state-target: #8FCF4A;
+  --state-over: #FF3B30;
+
+  /* Primary accent -- signal orange, the one real risk in this palette */
+  --accent: #FF5A1F;
+
+  --radius: 4px;
+  --radius-lg: 8px;
+
+  --font-display: "Bahnschrift", "Arial Narrow", sans-serif;
+  --font-sans: system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+  --font-mono: "Cascadia Mono", Consolas, ui-monospace, "SF Mono", monospace;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+}
+
+.app {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 20px 24px 48px;
+}
+
+/* --- Week header --- */
+
+.week-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 20px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 16px 20px;
+  margin-bottom: 16px;
+}
+
+.week-nav {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+}
+
+.nav-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border-strong);
+  background: var(--surface-raised);
+  color: var(--text-primary);
+  font-size: 1.1rem;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.nav-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+/* --- Week picker (calendar dropdown) --- */
+
+.week-picker {
+  position: relative;
+}
+
+.week-range-btn {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 1.05rem;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  width: 200px;
+  text-align: center;
+  color: var(--text-primary);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  padding: 5px 8px;
+  cursor: pointer;
+}
+.week-range-btn:hover,
+.week-range-btn.is-open {
+  border-color: var(--border-strong);
+  background: var(--surface-raised);
+}
+.week-range-btn.is-open {
+  color: var(--accent);
+}
+
+.week-picker-popover {
+  position: absolute;
+  top: calc(100% + 11px);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 20;
+  width: 248px;
+  background: var(--surface-raised);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-lg);
+  padding: 12px;
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.55);
+  animation: correction-popover-in 0.14s ease-out;
+}
+.week-picker-popover::before {
+  content: "";
+  position: absolute;
+  top: -5px;
+  left: 50%;
+  transform: translateX(-50%) rotate(45deg);
+  width: 9px;
+  height: 9px;
+  background: var(--surface-raised);
+  border-left: 1px solid var(--border-strong);
+  border-top: 1px solid var(--border-strong);
+}
+
+.week-picker-month-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.nav-btn-small {
+  width: 24px;
+  height: 24px;
+  font-size: 0.9rem;
+}
+
+.week-picker-month-label {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.8rem;
+  letter-spacing: 0.02em;
+}
+
+.week-picker-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
+}
+
+.week-picker-weekday {
+  text-align: center;
+  font-family: var(--font-display);
+  font-size: 0.6rem;
+  font-weight: 700;
+  color: var(--text-dim);
+  padding-bottom: 4px;
+}
+
+.week-picker-day {
+  position: relative;
+  height: 28px;
+  border: none;
+  background: transparent;
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  cursor: pointer;
+  border-radius: var(--radius);
+}
+.week-picker-day:hover {
+  background: var(--border);
+}
+.week-picker-day.is-outside {
+  color: var(--text-dim);
+  opacity: 0.5;
+}
+.week-picker-day.is-weekend {
+  color: var(--text-secondary);
+}
+/* Highlights the Mon-Fri work week the app is currently showing, as one
+   continuous band across the row -- the calendar's answer to "which week
+   am I on", not just "which day". */
+.week-picker-day.is-selected-workday {
+  background: rgba(255, 90, 31, 0.22);
+}
+.week-picker-day.is-selected-workday:hover {
+  background: rgba(255, 90, 31, 0.32);
+}
+.week-picker-day.is-week-start {
+  border-top-left-radius: var(--radius);
+  border-bottom-left-radius: var(--radius);
+}
+.week-picker-day.is-week-end {
+  border-top-right-radius: var(--radius);
+  border-bottom-right-radius: var(--radius);
+}
+.week-picker-day.is-today {
+  box-shadow: inset 0 0 0 1px var(--accent);
+  font-weight: 700;
+}
+
+.week-picker-today-btn {
+  width: 100%;
+  margin-top: 10px;
+  padding: 6px;
+  font-family: var(--font-display);
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  border-radius: var(--radius);
+  border: 1px solid var(--border-strong);
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+.week-picker-today-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.week-summary {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  flex: 1;
+  min-width: 300px;
+}
+
+.summary-hours {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.summary-total {
+  font-family: var(--font-mono);
+  font-size: 2.1rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  text-shadow: 0 0 10px rgba(255, 90, 31, 0.25);
+}
+
+.summary-target {
+  font-family: var(--font-display);
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--text-secondary);
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
+/* Console-lamp status indicator: a glowing dot + colored label, standing in
+   for a rounded SaaS badge -- like a lamp on a control panel. */
+.status-indicator {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+}
+.status-lamp {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--text-secondary);
+}
+.status-label {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-secondary);
+}
+.status-indicator.status-under .status-lamp { background: var(--state-under); box-shadow: 0 0 8px var(--state-under); }
+.status-indicator.status-under .status-label { color: var(--state-under); }
+.status-indicator.status-target .status-lamp { background: var(--state-target); box-shadow: 0 0 8px var(--state-target); }
+.status-indicator.status-target .status-label { color: var(--state-target); }
+.status-indicator.status-over .status-lamp { background: var(--state-over); box-shadow: 0 0 10px var(--state-over); animation: lamp-pulse 1.4s ease-in-out infinite; }
+.status-indicator.status-over .status-label { color: var(--state-over); }
+
+@keyframes lamp-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+/* Gauge meter: a tick-marked scale with a triangular needle at the target,
+   standing in for a plain progress bar. */
+.summary-meter {
+  flex: 1;
+  min-width: 140px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.summary-bar-wrapper {
+  position: relative;
+  flex: 1;
+}
+
+.summary-bar-track {
+  position: relative;
+  height: 14px;
+  background-color: var(--surface-raised);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  /* Tick marks every 5h across the 0-55h scale (11 segments) */
+  background-image: repeating-linear-gradient(
+    to right,
+    var(--border-strong) 0,
+    var(--border-strong) 1px,
+    transparent 1px,
+    transparent calc(100% / 11)
+  );
+}
+
+.summary-bar-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 0%;
+  transition: width 0.3s ease;
+}
+.summary-bar-fill.state-under { background: var(--state-under); }
+.summary-bar-fill.state-target { background: var(--state-target); }
+.summary-bar-fill.state-over { background: var(--state-over); }
+
+/* Positioned as a sibling of (not inside) .summary-bar-track so its needle
+   can extend above the track without being clipped by the track's
+   overflow:hidden (which exists to clip the fill's corners). */
+.summary-bar-target-marker {
+  position: absolute;
+  top: -7px;
+  bottom: -2px;
+  width: 2px;
+  background: var(--text-primary);
+  opacity: 0.85;
+}
+.summary-bar-target-marker::after {
+  content: "";
+  position: absolute;
+  top: -6px;
+  left: 50%;
+  transform: translateX(-50%);
+  border-left: 5px solid transparent;
+  border-right: 5px solid transparent;
+  border-top: 6px solid var(--text-primary);
+}
+
+/* --- Day rows --- */
+
+.week-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.day-row {
+  position: relative;
+  display: grid;
+  grid-template-columns: 76px 1fr 138px;
+  align-items: center;
+  gap: 16px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 12px 18px;
+}
+
+/* Punch-notches on the left edge, like a ticket stub torn from a card. */
+.day-row::before,
+.day-row::after {
+  content: "";
+  position: absolute;
+  left: -7px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--bg);
+  border: 1px solid var(--border);
+}
+.day-row::before { top: 10px; }
+.day-row::after { bottom: 10px; }
+
+.day-row-header .weekday {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.95rem;
+  letter-spacing: 0.08em;
+  color: var(--text-primary);
+}
+.day-row-header .date {
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  margin-top: 2px;
+}
+
+.day-row-timeline {
+  min-width: 0;
+}
+
+/* Ruler-style axis: major ticks (labeled, every 6h) are taller and brighter
+   than the minor ticks (every 3h), like a physical measuring instrument. */
+.timeline-axis {
+  position: relative;
+  height: 16px;
+  margin-bottom: 4px;
+}
+.axis-tick {
+  position: absolute;
+  bottom: 0;
+  width: 1px;
+}
+.axis-tick-minor {
+  height: 5px;
+  background: var(--border-strong);
+}
+.axis-tick-major {
+  height: 9px;
+  background: var(--text-dim);
+}
+.axis-tick-label {
+  position: absolute;
+  top: -13px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  color: var(--text-dim);
+  white-space: nowrap;
+}
+.axis-tick-label-start { transform: translateX(0); }
+.axis-tick-label-end { transform: translateX(-100%); }
+
+.timeline-track {
+  position: relative;
+  height: 44px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background-color: var(--surface-raised);
+  /* Hour gridlines across the full 24h range */
+  background-image: repeating-linear-gradient(
+    to right,
+    var(--border) 0,
+    var(--border) 1px,
+    transparent 1px,
+    transparent calc(100% / 24)
+  );
+  cursor: crosshair;
+}
+
+.timeline-block {
+  position: absolute;
+  top: 5px;
+  bottom: 5px;
+  border: none;
+  border-radius: 3px;
+  padding: 0 8px;
+  font-family: var(--font-sans);
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--text-on-accent);
+  overflow: hidden;
+  cursor: pointer;
+  transition: transform 0.1s ease, filter 0.1s ease;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 1px;
+}
+.block-name {
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.2;
+}
+.block-desc {
+  font-size: 0.65rem;
+  font-weight: 400;
+  opacity: 0.65;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.2;
+}
+.timeline-block:hover {
+  filter: brightness(1.12);
+}
+.timeline-block-dragging {
+  filter: brightness(1.2);
+  cursor: grabbing;
+  z-index: 2;
+}
+.timeline-block-invalid {
+  animation: block-invalid-flash 0.4s ease;
+}
+@keyframes block-invalid-flash {
+  0%, 100% { filter: none; }
+  30%, 70% { filter: brightness(0.6) saturate(3) hue-rotate(-40deg); }
+}
+
+/* Preview block shown while dragging on the timeline track. */
+.timeline-ghost {
+  position: absolute;
+  top: 5px;
+  bottom: 5px;
+  background: rgba(255, 90, 31, 0.2);
+  border: 1px solid var(--accent);
+  border-radius: 3px;
+  pointer-events: none;
+}
+
+/* Floating tooltip that follows the cursor during drag interactions. */
+.drag-tooltip {
+  position: fixed;
+  transform: translate(-50%, -130%);
+  background: var(--surface-raised);
+  color: var(--text-primary);
+  border: 1px solid var(--accent);
+  border-radius: var(--radius);
+  padding: 3px 8px;
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  pointer-events: none;
+  z-index: 50;
+}
+.timeline-block.loc-remote { background: var(--loc-remote); }
+.timeline-block.loc-inoffice { background: var(--loc-inoffice); }
+.timeline-block.loc-other {
+  background: var(--loc-other);
+  border: 1px dashed var(--text-dim);
+}
+
+.day-row-summary {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+}
+
+.day-total-group {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.day-target {
+  font-family: var(--font-display);
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: var(--text-dim);
+  white-space: nowrap;
+}
+
+/* Recessed LED-readout look for the day total */
+.day-total {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 1rem;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+  color: var(--text-primary);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 4px 10px;
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.5);
+  text-shadow: 0 0 6px rgba(245, 239, 226, 0.3);
+}
+
+.day-row-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.add-btn {
+  padding: 5px 10px;
+  font-family: var(--font-display);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  border-radius: var(--radius);
+  border: 1px solid var(--accent);
+  background: transparent;
+  color: var(--accent);
+  cursor: pointer;
+}
+.add-btn:hover {
+  background: var(--accent);
+  color: var(--text-on-accent);
+}
+
+.remove-all-btn {
+  padding: 5px 10px;
+  font-family: var(--font-display);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  border-radius: var(--radius);
+  border: 1px solid var(--border-strong);
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+.remove-all-btn:hover {
+  background: var(--state-over);
+  border-color: var(--state-over);
+  color: var(--text-on-accent);
+}
+
+/* --- Modal --- */
+
+.session-dialog {
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  color: var(--text-primary);
+  padding: 24px;
+  width: min(420px, 90vw);
+}
+.session-dialog::backdrop {
+  background: rgba(21, 18, 15, 0.8);
+}
+
+#dialog-title {
+  font-family: var(--font-display);
+  margin: 0 0 4px;
+  font-size: 1.2rem;
+  letter-spacing: 0.01em;
+}
+.dialog-date-label {
+  margin: 0 0 18px;
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+}
+
+.form-row {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 12px;
+}
+.form-row label {
+  font-family: var(--font-display);
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--text-secondary);
+  margin-bottom: 4px;
+}
+.form-row-split {
+  flex-direction: row;
+  gap: 12px;
+}
+.form-row-split > div {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+input,
+select {
+  background: var(--surface-raised);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  color: var(--text-primary);
+  padding: 8px;
+  font-size: 0.95rem;
+  font-family: var(--font-sans);
+}
+#start-input,
+#end-input {
+  font-family: var(--font-mono);
+}
+input:focus,
+select:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.dialog-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 18px;
+}
+.dialog-actions-right {
+  display: flex;
+  gap: 8px;
+}
+
+.btn-primary,
+.btn-secondary,
+.btn-delete {
+  padding: 8px 16px;
+  font-family: var(--font-display);
+  font-size: 0.85rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+.btn-primary {
+  border: none;
+  background: var(--accent);
+  color: var(--text-on-accent);
+}
+.btn-primary:hover {
+  filter: brightness(1.1);
+}
+.btn-secondary {
+  border: 1px solid var(--border-strong);
+  background: transparent;
+  color: var(--text-primary);
+}
+.btn-secondary:hover {
+  background: var(--surface-raised);
+}
+.btn-delete {
+  border: 1px solid var(--state-over);
+  background: transparent;
+  color: var(--state-over);
+}
+.btn-delete:hover {
+  background: var(--state-over);
+  color: var(--text-on-accent);
+}
+
+/* --- Correction widget --- */
+
+.correction-col {
+  position: relative;
+  display: inline-flex;
+  flex-shrink: 0;
+}
+
+/* Reads as one more panel readout in the header row (alongside the nav
+   buttons and status lamp): a trim indicator + a recessed LED value,
+   the same recessed-display language as .day-total. */
+.correction-btn {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  height: 32px;
+  padding: 0 10px 0 4px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.5);
+  color: var(--text-primary);
+  cursor: pointer;
+}
+.correction-btn:hover,
+.correction-btn.is-open {
+  border-color: var(--accent);
+}
+.correction-btn.is-open .correction-btn-icon {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--text-on-accent);
+}
+
+.correction-btn-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 1px solid var(--border-strong);
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--accent);
+  line-height: 1;
+}
+
+.correction-btn-label {
+  font-family: var(--font-display);
+  font-size: 0.62rem;
+  font-weight: 700;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.correction-btn-value {
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  text-shadow: 0 0 6px rgba(245, 239, 226, 0.3);
+}
+
+/* Detached dropdown card, clearly a separate surface from the button:
+   floats below it with a gap, a connecting caret, its own drop shadow,
+   and a pop-in entrance so it reads as a menu appearing, not the button
+   changing shape. */
+.correction-popover {
+  position: absolute;
+  top: calc(100% + 11px);
+  right: 0;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 172px;
+  background: var(--surface-raised);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-lg);
+  padding: 10px 12px;
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.55);
+  animation: correction-popover-in 0.14s ease-out;
+}
+.correction-popover::before {
+  content: "";
+  position: absolute;
+  top: -5px;
+  right: 12px;
+  width: 9px;
+  height: 9px;
+  background: var(--surface-raised);
+  border-left: 1px solid var(--border-strong);
+  border-top: 1px solid var(--border-strong);
+  transform: rotate(45deg);
+}
+@keyframes correction-popover-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.correction-popover-heading {
+  font-family: var(--font-display);
+  font-size: 0.62rem;
+  font-weight: 700;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.correction-popover-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.correction-popover-input-wrap {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.correction-popover-input {
+  width: 48px;
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  color: var(--text-primary);
+  background: var(--bg);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  padding: 3px 4px;
+  text-align: center;
+}
+.correction-popover-input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.correction-popover-unit {
+  font-size: 0.68rem;
+  color: var(--text-dim);
+}
+
+.correction-popover-btn {
+  width: 26px;
+  height: 26px;
+  font-family: var(--font-display);
+  font-size: 0.95rem;
+  font-weight: 700;
+  line-height: 1;
+  border-radius: var(--radius);
+  border: 1px solid var(--border-strong);
+  background: var(--bg);
+  color: var(--text-primary);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.correction-popover-btn:hover {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--text-on-accent);
+}
+
+/* --- Errors --- */
+
+.error {
+  color: var(--state-over);
+  background: rgba(255, 30, 57, 0.12);
+  border: 1px solid var(--state-over);
+  border-radius: var(--radius);
+  padding: 10px 14px;
+  margin-bottom: 16px;
+  font-size: 0.85rem;
+}
