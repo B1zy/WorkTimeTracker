@@ -1083,29 +1083,40 @@ select:focus {
   height: 64px;
   overflow: visible;
 }
-.overview-line-target {
-  stroke: var(--border-strong);
-  stroke-width: 1;
-  stroke-dasharray: 3 3;
-  vector-effect: non-scaling-stroke;
-}
+/* Stroke/fill for both are set inline per entry type (settings-driven
+   colors), so these just carry the shape. */
 .overview-line-path {
   fill: none;
-  stroke: var(--accent);
   stroke-width: 2;
   stroke-linecap: round;
   stroke-linejoin: round;
   vector-effect: non-scaling-stroke;
 }
 .overview-line-dot {
-  fill: var(--border-strong);
   stroke: var(--surface);
   stroke-width: 1;
   vector-effect: non-scaling-stroke;
 }
-.overview-line-dot.state-target { fill: var(--state-target); }
-.overview-line-dot.state-under { fill: var(--state-under); }
-.overview-line-dot.state-over { fill: var(--state-over); }
+
+.overview-type-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  margin-top: 10px;
+  font-size: 0.68rem;
+  color: var(--text-dim);
+}
+.overview-type-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.overview-type-legend-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
 
 .overview-weekday-chart {
   display: flex;

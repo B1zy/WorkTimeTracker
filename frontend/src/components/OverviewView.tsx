@@ -3,10 +3,16 @@ import { useSettings } from "../contexts/SettingsContext";
 import { useOverviewData } from "../hooks/useOverviewData";
 import { buildCalendarYearWeeks } from "../utils/calendar";
 import { formatDuration, getMonday, toISODate } from "../utils/dateUtils";
+import { ENTRY_TYPE_LABEL } from "../utils/timelineLayout";
 import { WEEKDAY_LABEL, workdayCount, workdayOffsets, type Weekday } from "../utils/workweek";
 import { classifySummaryState, dayTargetMinutes, meterMaxMinutes } from "../utils/weekSummary";
+import type { EntryType } from "../types/WorkSession";
 import { SettingsPanel } from "./SettingsPanel";
 import { SettingsSidebar } from "./SettingsSidebar";
+
+// Charted in this fixed order (rather than however each week's sessions
+// happen to sort) so a type's line/legend position stays put week to week.
+const CHART_ENTRY_TYPES: EntryType[] = ["Working", "Sick", "OvertimeCompensation", "Appointment", "Lunch"];
 
 // Levels 1-4 scale linearly from 0h up to the daily target (100%); level 5 is
 // reserved for days that beat the target by a full hour or more, so "hit your
@@ -62,7 +68,18 @@ export function OverviewView({ onClearAllData, onExportData, onImportData }: Ove
   );
   const startIso = toISODate(weeks[0][0]);
   const endIso = toISODate(weeks[weeks.length - 1][weeks[weeks.length - 1].length - 1]);
-  const { minutesByDate, loading, error } = useOverviewData(startIso, endIso);
+  const { minutesByDate, minutesByDateAndType, loading, error } = useOverviewData(startIso, endIso);
+
+  // "Working" has no user-customizable color (it's colored by location on the
+  // timebar instead) -- accent is what the rest of the app already uses for
+  // it, so the line chart stays visually consistent with the heatmap/bars.
+  const entryTypeColor: Record<EntryType, string> = {
+    Working: "var(--accent)",
+    Sick: settings.colors.typeSick,
+    OvertimeCompensation: settings.colors.typeOvertimeCompensation,
+    Appointment: settings.colors.typeAppointment,
+    Lunch: settings.colors.typeLunch,
+  };
 
   const weekTarget = settings.weeklyTargetMinutes;
   const dayTarget = dayTargetMinutes(weekTarget, workdayCount(settings.workdays));
@@ -163,34 +180,50 @@ export function OverviewView({ onClearAllData, onExportData, onImportData }: Ove
   const weekdayTargetLinePercent = Math.min((dayTarget / weekdayMax) * 100, 100);
 
   // Recent-weeks line chart: the bar chart above already covers the full
-  // year, so this is deliberately just the last quarter -- a line reads
-  // trend/direction better than bars at a glance, which is the point of
-  // having both. Ends at the current week (or the year's last tracked week,
-  // for a moment right at a year boundary).
+  // year (and the total), so this is deliberately just the last quarter --
+  // and, since the total is already up there, this one breaks that same
+  // window down by session type instead of repeating it. Ends at the current
+  // week (or the year's last tracked week, for a moment right at a year
+  // boundary).
   const recentWeeks = useMemo(() => {
     const endIndex = currentWeekIndex >= 0 ? currentWeekIndex : weekTotals.length - 1;
     const startIndex = Math.max(0, endIndex - RECENT_WEEK_COUNT + 1);
-    return weekTotals.slice(startIndex, endIndex + 1).map((minutes, i) => ({
-      weekStart: weeks[startIndex + i][0],
-      minutes,
+    return weeks.slice(startIndex, endIndex + 1).map((week) => ({
+      weekStart: week[0],
+      // Raw (un-weighted) minutes per entry type -- the composition of the
+      // week, not the counted total the bar chart above already shows.
+      byType: CHART_ENTRY_TYPES.reduce((acc, type) => {
+        acc[type] = week.reduce((sum, day) => sum + (minutesByDateAndType[toISODate(day)]?.[type] ?? 0), 0);
+        return acc;
+      }, {} as Record<EntryType, number>),
     }));
-  }, [weekTotals, weeks, currentWeekIndex]);
+  }, [weeks, currentWeekIndex, weekTotals.length, minutesByDateAndType]);
+
+  // Only chart types that actually occurred in this window -- a flat zero
+  // line for a type nobody logged would just be legend noise.
+  const activeChartTypes = useMemo(
+    () => CHART_ENTRY_TYPES.filter((type) => recentWeeks.some((w) => w.byType[type] > 0)),
+    [recentWeeks]
+  );
 
   const lineChartWidth = 220;
   const lineChartHeight = 56;
-  const linePoints = useMemo(() => {
+  const typeChartMax = Math.max(1, ...recentWeeks.flatMap((w) => activeChartTypes.map((type) => w.byType[type])));
+  const typeLines = activeChartTypes.map((type) => {
     const n = recentWeeks.length;
-    return recentWeeks.map(({ weekStart, minutes }, i) => ({
+    const points = recentWeeks.map((w, i) => ({
       x: n > 1 ? (i / (n - 1)) * lineChartWidth : lineChartWidth / 2,
-      y: lineChartHeight - Math.min(Math.abs(minutes) / weekMax, 1) * lineChartHeight,
-      state: minutes !== 0 ? classifySummaryState(minutes, weekTarget) : null,
-      tooltip: `Week of ${weekStart.toLocaleDateString(undefined, { month: "short", day: "numeric" })} — ${
-        minutes !== 0 ? formatDuration(minutes) : "No entries"
-      }`,
+      y: lineChartHeight - (w.byType[type] / typeChartMax) * lineChartHeight,
+      minutes: w.byType[type],
+      weekStart: w.weekStart,
     }));
-  }, [recentWeeks, weekMax, weekTarget]);
-  const linePath = linePoints.map((p, i) => `${i === 0 ? "M" : "L"}${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(" ");
-  const lineTargetY = lineChartHeight - Math.min(weekTarget / weekMax, 1) * lineChartHeight;
+    return {
+      type,
+      color: entryTypeColor[type],
+      path: points.map((p, i) => `${i === 0 ? "M" : "L"}${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(" "),
+      points,
+    };
+  });
 
   return (
     <div className="overview-page">
@@ -297,35 +330,46 @@ export function OverviewView({ onClearAllData, onExportData, onImportData }: Ove
 
           <div className="overview-secondary-chart overview-line-chart-col">
             <h3 className="overview-section-title overview-section-title-spaced">
-              Last {recentWeeks.length} weeks
+              Last {recentWeeks.length} weeks by type
             </h3>
             <svg
               className="overview-line-chart"
               viewBox={`0 0 ${lineChartWidth} ${lineChartHeight}`}
               preserveAspectRatio="none"
               role="img"
-              aria-label={`Hours per week over the last ${recentWeeks.length} weeks`}
+              aria-label={`Weekly hours by session type over the last ${recentWeeks.length} weeks`}
             >
-              <line
-                className="overview-line-target"
-                x1={0}
-                x2={lineChartWidth}
-                y1={lineTargetY}
-                y2={lineTargetY}
-              />
-              {linePoints.length > 1 && <path className="overview-line-path" d={linePath} />}
-              {linePoints.map((p, i) => (
-                <circle
-                  key={recentWeeks[i].weekStart.toISOString()}
-                  className={`overview-line-dot${p.state ? ` state-${p.state}` : ""}`}
-                  cx={p.x}
-                  cy={p.y}
-                  r={2.6}
-                >
-                  <title>{p.tooltip}</title>
-                </circle>
-              ))}
+              {typeLines.map(
+                ({ type, color, path, points }) =>
+                  points.length > 1 && <path key={type} className="overview-line-path" style={{ stroke: color }} d={path} />
+              )}
+              {typeLines.map(({ type, color, points }) =>
+                points.map((p) => (
+                  <circle
+                    key={`${type}-${p.weekStart.toISOString()}`}
+                    className="overview-line-dot"
+                    style={{ fill: color }}
+                    cx={p.x}
+                    cy={p.y}
+                    r={2.2}
+                  >
+                    <title>
+                      {ENTRY_TYPE_LABEL[type]} · Week of{" "}
+                      {p.weekStart.toLocaleDateString(undefined, { month: "short", day: "numeric" })} —{" "}
+                      {p.minutes > 0 ? formatDuration(p.minutes) : "No entries"}
+                    </title>
+                  </circle>
+                ))
+              )}
             </svg>
+            <div className="overview-type-legend">
+              {activeChartTypes.map((type) => (
+                <span key={type} className="overview-type-legend-item">
+                  <span className="overview-type-legend-dot" style={{ background: entryTypeColor[type] }} />
+                  {ENTRY_TYPE_LABEL[type]}
+                </span>
+              ))}
+            </div>
           </div>
         </div>
 

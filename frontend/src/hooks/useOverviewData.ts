@@ -2,10 +2,14 @@ import { useEffect, useMemo, useState } from "react";
 import { getSessions } from "../api/workSessions";
 import { sumCountedMinutes } from "../utils/entryTypeCounting";
 import { useSettings } from "../contexts/SettingsContext";
-import type { WorkSession } from "../types/WorkSession";
+import { durationMinutes } from "../utils/dateUtils";
+import type { EntryType, WorkSession } from "../types/WorkSession";
 
 export interface OverviewData {
   minutesByDate: Record<string, number>;
+  // Raw (un-weighted) session duration per date, broken down by entry type --
+  // the composition view, as opposed to minutesByDate's counted total.
+  minutesByDateAndType: Record<string, Partial<Record<EntryType, number>>>;
   loading: boolean;
   error: string | null;
 }
@@ -56,5 +60,14 @@ export function useOverviewData(startIso: string, endIso: string): OverviewData 
     return map;
   }, [sessions, settings.entryTypeCounting]);
 
-  return { minutesByDate, loading, error };
+  const minutesByDateAndType = useMemo(() => {
+    const map: Record<string, Partial<Record<EntryType, number>>> = {};
+    for (const session of sessions) {
+      const byType = (map[session.date] ??= {});
+      byType[session.entryType] = (byType[session.entryType] ?? 0) + durationMinutes(session.start, session.end);
+    }
+    return map;
+  }, [sessions]);
+
+  return { minutesByDate, minutesByDateAndType, loading, error };
 }
