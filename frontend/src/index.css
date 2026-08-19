@@ -809,6 +809,39 @@ body {
   color: var(--text-on-accent);
 }
 
+/* Phone-width layout: .day-row's 76px/1fr/138px column grid was the one
+   genuinely fixed (non-fluid) layout left in the app -- fine down to tablet
+   widths, but the side columns eat too much of a ~360px viewport and leave
+   the timeline too cramped to use. Below this, stack header/timeline/summary
+   into full-width rows instead, card-style. */
+@media (max-width: 640px) {
+  .app {
+    padding: 16px 14px 32px;
+  }
+  .day-row {
+    grid-template-columns: 1fr;
+    row-gap: 10px;
+  }
+  .day-row-header {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+  }
+  .day-row-header .date {
+    margin-top: 0;
+  }
+  .day-row-summary {
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .day-total-group {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
+  }
+}
+
 /* --- Modal --- */
 
 .session-dialog {
@@ -1305,6 +1338,7 @@ select:focus {
   letter-spacing: 0.01em;
 }
 
+
 /* The sidebar variant: capped to two short (color-only) sections and a fixed
    width, so it sits beside the charts -- the rest of the settings flow into
    the full-width panel below instead. Stretched (via .overview-page-top's
@@ -1351,17 +1385,18 @@ select:focus {
   flex: 1.4 1 0;
 }
 
-/* A real grid rather than the masonry (CSS columns) this used to be: every
-   card in a row now stretches to the row's tallest, so the four cards fill
-   the whole height of the panel edge-to-edge instead of each stopping at its
-   own content. "auto-fit, minmax(240px, 1fr)" keeps all four in one row on a
-   normal desktop width and drops to 2/1 columns as it narrows. */
+/* A real grid rather than the masonry (CSS columns) this used to be: equal-
+   width cards that wrap as needed, each sized to its own content and
+   top-aligned (not stretched to the row's tallest) -- a short card like
+   Timebar range shouldn't grow to match a denser neighbor. "auto-fit,
+   minmax(260px, 1fr)" keeps all four in one row on a normal desktop width
+   and drops to 2/1 columns as it narrows. */
 .settings-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
   gap: 12px;
   margin-top: 16px;
-  align-items: stretch;
+  align-items: start;
 }
 
 .settings-section {
@@ -1372,13 +1407,24 @@ select:focus {
   display: flex;
   flex-direction: column;
 }
-/* In the main panel (not the sidebar), a short card (Timebar range, Data &
-   backup) still gets stretched to match the row's tallest card (What counts
-   as worked time). Centering the title+content+hint as one tight block reads
-   as a balanced, deliberately-padded card; space-between was tried first but
-   split the leftover height into one big awkward gap right above the hint. */
-.settings-grid .settings-section {
-  justify-content: center;
+
+/* Timebar range + Data & backup share one grid column instead of each
+   getting their own. Same gap as the grid itself and the same card padding
+   as every other .settings-section, so the pair reads as two normal cards
+   stacked -- not a cramped, separately-scaled sub-panel. */
+.settings-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+
+/* Every card in the main panel shares the same shape: a mono group label,
+   then controls, then one muted help line -- the mono face is scoped to this
+   context (not the sidebar's color-section titles) so it reads as a distinct
+   "settings field group" label rather than the sidebar's card heading. */
+.settings-grid .settings-section-title {
+  font-family: var(--font-mono);
 }
 
 .settings-section-title {
@@ -1415,20 +1461,90 @@ select:focus {
   margin-bottom: 0;
 }
 
-/* Timebar range specifically: at the card widths the settings grid now uses,
-   side-by-side start/end inputs squeeze their labels into a line-break.
-   Stacking them and shrinking the label font fixes that without touching
-   .form-row-split's shared (wider) layout in SessionDialog. */
-.settings-section .form-row-split {
-  flex-direction: column;
+/* Weekly target: the bare number input's meaning (hours per week) doesn't
+   have to be inferred once there's a unit sitting right next to it. */
+.settings-input-with-unit {
+  display: flex;
+  align-items: center;
   gap: 8px;
 }
-.settings-section .form-row-split label {
-  font-size: 0.66rem;
+.settings-input-with-unit input {
+  flex: 0 0 auto;
+  width: 68px;
 }
-.settings-section .form-row-split input {
-  padding: 10px 12px;
-  font-size: 1.1rem;
+.settings-input-unit {
+  font-family: var(--font-mono);
+  font-size: 0.66rem;
+  color: var(--text-dim);
+  white-space: nowrap;
+}
+
+/* Timebar range: two real clock fields on one row instead of two stacked,
+   separately-labelled raw-hour fields. */
+.settings-time-range-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.settings-time-range-row input[type="time"] {
+  flex: 0 0 auto;
+  width: 84px;
+  padding: 5px 6px;
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+}
+/* The browser's default clock-picker glyph renders near-black -- invert it
+   so it's visible against this dark theme. */
+.settings-time-range-row input[type="time"]::-webkit-calendar-picker-indicator {
+  filter: invert(0.8);
+  cursor: pointer;
+}
+.settings-time-range-to {
+  flex-shrink: 0;
+  font-family: var(--font-display);
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--text-dim);
+}
+/* The range as a shape, not arithmetic: a 24h track with the selected window
+   filled, ticked at the day's start/middle/end. */
+.settings-time-range-preview {
+  margin-top: 12px;
+}
+.settings-time-range-track {
+  position: relative;
+  height: 18px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+.settings-time-range-fill {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  min-width: 2px;
+  background: var(--accent);
+}
+.settings-time-range-ticks {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 4px;
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  color: var(--text-dim);
+}
+
+/* Separates the safe actions (export/restore, described by the hint just
+   above) from the destructive one below -- so "Clear all data" doesn't read
+   as one more option in that list. */
+.settings-divider {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 10px 0;
 }
 
 .settings-reset-btn {
@@ -1463,11 +1579,13 @@ select:focus {
   gap: 4px;
 }
 
+/* The chip itself is the toggle now (a <button>, not a checkbox+label) --
+   selected state is carried by fill/weight (color + border), not a separate
+   checkbox glyph. */
 .settings-weekday {
   display: flex;
   align-items: center;
-  gap: 3px;
-  padding: 4px 6px;
+  padding: 4px 8px;
   font-family: var(--font-display);
   font-size: 0.66rem;
   font-weight: 700;
@@ -1484,40 +1602,46 @@ select:focus {
 .settings-weekday.is-on {
   color: var(--accent);
   border-color: var(--accent);
+  font-weight: 800;
 }
-.settings-weekday:has(input:disabled) {
+.settings-weekday:disabled {
   cursor: not-allowed;
   opacity: 0.7;
 }
-.settings-weekday input {
-  margin: 0;
-  cursor: inherit;
-}
 
+/* Fixed label column + flexible control column, shared across every row, so
+   every select lines up on one left edge and one width. .settings-counting-
+   row is display:contents -- its label/select become direct children of the
+   grid rather than nesting an extra flex row per type. */
 .settings-counting-grid {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.settings-counting-row {
-  display: flex;
+  display: grid;
+  grid-template-columns: auto 1fr;
   align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  row-gap: 3px;
-  column-gap: 8px;
-  font-size: 0.78rem;
+  row-gap: 8px;
+  column-gap: 10px;
+}
+.settings-counting-row {
+  display: contents;
+}
+.settings-counting-label {
+  font-size: 0.76rem;
   color: var(--text-primary);
+  white-space: nowrap;
 }
-.settings-counting-row select {
-  flex: 1 1 120px;
-  min-width: 0;
-  max-width: 100%;
+.settings-counting-select {
+  width: 100%;
   font-size: 0.74rem;
-  padding: 3px 5px;
+  padding: 5px 24px 5px 7px;
+  /* Custom chevron so the native one doesn't clash with the field's own
+     border/radius treatment -- matches the shared input/select field look
+     instead of the browser's default control chrome. */
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%23B3A488' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 8px center;
 }
-.settings-counting-row select:disabled {
+.settings-counting-select:disabled {
   opacity: 0.55;
   cursor: not-allowed;
 }
@@ -1753,41 +1877,18 @@ select:focus {
 }
 
 /* --- Motion ---
-   Entrance animations replay whenever their elements actually mount -- day
-   rows remount on every week change (keyed by ISO date), the whole Overview
-   tree remounts on every tab switch, so no extra JS trigger is needed. Press
-   feedback is the same idea applied to clicks: a quick, tactile scale-down
-   that fits the console/switch-panel language the rest of the UI already
-   uses (the invalid-flash on a rejected drag, etc). */
-
-@keyframes row-in {
-  from {
-    opacity: 0;
-    transform: translateY(8px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-.day-row {
-  animation: row-in 0.32s ease-out backwards;
-  animation-delay: calc(var(--row-index, 0) * 45ms);
-}
-
-@keyframes block-in {
-  from {
-    opacity: 0;
-    transform: scale(0.85);
-  }
-  to {
-    opacity: 1;
-    transform: scale(1);
-  }
-}
-.timeline-block {
-  animation: block-in 0.2s ease-out;
-}
+   One shared animation language, not a per-page one: card-in (fade + rise)
+   for row/card-shaped elements, cell-in (fade + scale) for small grid-style
+   items, both ease-out, both in the 0.25-0.3s range. This Week's day rows
+   and timeline blocks used to have their own separate row-in/block-in
+   animations, tuned differently from Overview's -- that mismatch (different
+   curve, different distances, different durations) was what made the two
+   pages feel like different apps. They now just reuse card-in/cell-in
+   directly. Day rows remount on every week navigation, so they get a light
+   stagger the same way the heatmap cells do (a small fixed delay per item);
+   timeline blocks pop in together with no stagger, same as the original
+   cell-in usage wherever one wasn't needed. Press feedback stays instant --
+   no easing curve needed for a 1-frame state change. */
 
 @keyframes card-in {
   from {
@@ -1809,6 +1910,10 @@ select:focus {
   animation: card-in 0.3s ease-out backwards;
   animation-delay: 0.08s;
 }
+.day-row {
+  animation: card-in 0.3s ease-out backwards;
+  animation-delay: calc(var(--row-index, 0) * 40ms);
+}
 
 /* A left-to-right "power on" sweep across the year, like a bank of console
    lamps lighting in sequence -- capped so a full year's worth of cells still
@@ -1826,6 +1931,9 @@ select:focus {
 .overview-grid .overview-cell {
   animation: cell-in 0.3s ease-out backwards;
   animation-delay: min(calc(var(--week-index, 0) * 4ms), 260ms);
+}
+.timeline-block {
+  animation: cell-in 0.3s ease-out backwards;
 }
 
 /* Tactile press feedback, consistent across every clickable control. */

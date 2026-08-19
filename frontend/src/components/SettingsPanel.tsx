@@ -5,12 +5,32 @@ import {
   COUNTING_MODE_LABEL,
   type CountingMode,
 } from "../utils/entryTypeCounting";
-import { WEEKDAY_DISPLAY_ORDER, WEEKDAY_LABEL, workdayCount, type Weekday } from "../utils/workweek";
+import { WEEKDAY_DISPLAY_ORDER, WEEKDAY_LABEL, type Weekday } from "../utils/workweek";
 import { ENTRY_TYPE_LABEL } from "../utils/timelineLayout";
-import { dayTargetLabel } from "../utils/weekSummary";
+import { timeStringToMinutes } from "../utils/dateUtils";
 import type { EntryType } from "../types/WorkSession";
 
 const ENTRY_TYPES: EntryType[] = ["Working", "Sick", "OvertimeCompensation", "Appointment", "Lunch"];
+
+// Shortened only for this settings list, where a fixed label column leaves no
+// room for the full name to avoid wrapping -- everywhere else (timeline
+// titles, aria-labels) still uses the full ENTRY_TYPE_LABEL.
+const SETTINGS_ENTRY_TYPE_LABEL: Partial<Record<EntryType, string>> = {
+  OvertimeCompensation: "Overtime comp.",
+};
+
+const DAY_MINUTES = 24 * 60;
+
+// <input type="time"> can't represent "24:00" (valid range is 00:00-23:59),
+// so the display clamps to 23:59 for that one boundary value. The stored
+// minutes are untouched -- this only affects what the picker shows until the
+// user actually changes it.
+function minutesToTimeInputValue(mins: number): string {
+  const clamped = Math.min(Math.max(Math.round(mins), 0), DAY_MINUTES - 1);
+  const h = Math.floor(clamped / 60);
+  const m = clamped % 60;
+  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+}
 
 interface SettingsPanelProps {
   onClearAllData: () => Promise<void>;
@@ -39,16 +59,16 @@ export function SettingsPanel({ onClearAllData, onExportData, onImportData }: Se
   }
 
   function handleTimelineStartChange(event: ChangeEvent<HTMLInputElement>) {
-    const hours = Number(event.target.value);
-    if (!Number.isFinite(hours) || hours < 0) return;
-    const mins = Math.round(hours * 60);
+    const value = event.target.value;
+    if (!value) return;
+    const mins = timeStringToMinutes(value);
     updateSettings((prev) => ({ ...prev, timelineStartMin: Math.min(mins, prev.timelineEndMin - 60) }));
   }
 
   function handleTimelineEndChange(event: ChangeEvent<HTMLInputElement>) {
-    const hours = Number(event.target.value);
-    if (!Number.isFinite(hours) || hours <= 0) return;
-    const mins = Math.round(hours * 60);
+    const value = event.target.value;
+    if (!value) return;
+    const mins = timeStringToMinutes(value);
     updateSettings((prev) => ({ ...prev, timelineEndMin: Math.max(mins, prev.timelineStartMin + 60) }));
   }
 
@@ -123,55 +143,54 @@ export function SettingsPanel({ onClearAllData, onExportData, onImportData }: Se
       <section className="settings-section">
         <h3 className="settings-section-title">Weekly target</h3>
         <div className="form-row">
-          <label htmlFor="weekly-target-input">Target hours per week</label>
-          <input
-            id="weekly-target-input"
-            type="number"
-            min={1}
-            step={0.5}
-            value={settings.weeklyTargetMinutes / 60}
-            onChange={handleTargetHoursChange}
-          />
+          <label htmlFor="weekly-target-input">Target</label>
+          <div className="settings-input-with-unit">
+            <input
+              id="weekly-target-input"
+              type="number"
+              min={1}
+              step={0.5}
+              value={settings.weeklyTargetMinutes / 60}
+              onChange={handleTargetHoursChange}
+            />
+            <span className="settings-input-unit">hours / week</span>
+          </div>
         </div>
         <div className="form-row">
           <label>Work days</label>
-          <div className="settings-weekday-row">
+          <div className="settings-weekday-row" role="group" aria-label="Work days">
             {WEEKDAY_DISPLAY_ORDER.map((day) => {
               const checked = settings.workdays.includes(day);
               const isLastRemaining = checked && settings.workdays.length === 1;
               return (
-                <label
+                <button
                   key={day}
+                  type="button"
                   className={`settings-weekday${checked ? " is-on" : ""}`}
+                  aria-pressed={checked}
+                  disabled={isLastRemaining}
                   title={isLastRemaining ? "At least one work day is required" : undefined}
+                  onClick={() => handleWorkdayToggle(day, !checked)}
                 >
-                  <input
-                    type="checkbox"
-                    checked={checked}
-                    disabled={isLastRemaining}
-                    onChange={(e) => handleWorkdayToggle(day, e.target.checked)}
-                  />
-                  <span>{WEEKDAY_LABEL[day]}</span>
-                </label>
+                  {WEEKDAY_LABEL[day]}
+                </button>
               );
             })}
           </div>
         </div>
-        <p className="settings-hint">
-          Daily target ({dayTargetLabel(settings.weeklyTargetMinutes, workdayCount(settings.workdays))}) is the weekly
-          target split evenly across your {workdayCount(settings.workdays)} work day
-          {workdayCount(settings.workdays) === 1 ? "" : "s"}. Turning a day off hides its entries rather than deleting
-          them.
-        </p>
       </section>
 
       <section className="settings-section">
         <h3 className="settings-section-title">What counts as worked time</h3>
         <div className="settings-counting-grid">
           {ENTRY_TYPES.map((type) => (
-            <label key={type} className="settings-counting-row">
-              <span>{ENTRY_TYPE_LABEL[type]}</span>
+            <div key={type} className="settings-counting-row">
+              <label htmlFor={`counting-${type}`} className="settings-counting-label">
+                {SETTINGS_ENTRY_TYPE_LABEL[type] ?? ENTRY_TYPE_LABEL[type]}
+              </label>
               <select
+                id={`counting-${type}`}
+                className="settings-counting-select"
                 value={settings.entryTypeCounting[type]}
                 disabled={type === "Working"}
                 onChange={(e) => handleCountingChange(type, e.target.value as CountingMode)}
@@ -182,44 +201,53 @@ export function SettingsPanel({ onClearAllData, onExportData, onImportData }: Se
                   </option>
                 ))}
               </select>
-            </label>
+            </div>
           ))}
         </div>
-        <p className="settings-hint">
-          Applies retroactively — changing these re-scores every past week, so the Overview totals will shift.
-          &ldquo;Subtracts&rdquo; suits time off taken against banked overtime, so it cancels out the week you earned it.
-        </p>
       </section>
 
+      {/* Timebar range + Data & backup stacked in one grid column, rather
+          than each taking its own -- together they're still shorter than
+          the "What counts" card, which stacking two separate narrow columns
+          side by side wasn't guaranteed to be. */}
+      <div className="settings-stack">
       <section className="settings-section">
         <h3 className="settings-section-title">Timebar range</h3>
-        <div className="form-row form-row-split">
-          <div>
-            <label htmlFor="timeline-start-input">Starts at (hour)</label>
-            <input
-              id="timeline-start-input"
-              type="number"
-              min={0}
-              max={23}
-              step={1}
-              value={settings.timelineStartMin / 60}
-              onChange={handleTimelineStartChange}
+        <div className="settings-time-range-row">
+          <input
+            id="timeline-start-input"
+            type="time"
+            lang="en-GB"
+            value={minutesToTimeInputValue(settings.timelineStartMin)}
+            onChange={handleTimelineStartChange}
+            aria-label="Starts at"
+          />
+          <span className="settings-time-range-to">to</span>
+          <input
+            id="timeline-end-input"
+            type="time"
+            lang="en-GB"
+            value={minutesToTimeInputValue(settings.timelineEndMin)}
+            onChange={handleTimelineEndChange}
+            aria-label="Ends at"
+          />
+        </div>
+        <div className="settings-time-range-preview">
+          <div className="settings-time-range-track">
+            <div
+              className="settings-time-range-fill"
+              style={{
+                left: `${(settings.timelineStartMin / DAY_MINUTES) * 100}%`,
+                width: `${((settings.timelineEndMin - settings.timelineStartMin) / DAY_MINUTES) * 100}%`,
+              }}
             />
           </div>
-          <div>
-            <label htmlFor="timeline-end-input">Ends at (hour)</label>
-            <input
-              id="timeline-end-input"
-              type="number"
-              min={1}
-              max={24}
-              step={1}
-              value={settings.timelineEndMin / 60}
-              onChange={handleTimelineEndChange}
-            />
+          <div className="settings-time-range-ticks">
+            <span>00:00</span>
+            <span>12:00</span>
+            <span>24:00</span>
           </div>
         </div>
-        <p className="settings-hint">What each day's timebar shows and how far you can drag or resize a block.</p>
       </section>
 
       <section className="settings-section">
@@ -245,6 +273,7 @@ export function SettingsPanel({ onClearAllData, onExportData, onImportData }: Se
           onChange={handleFileChosen}
         />
         {status && <p className="settings-hint settings-backup-status">{status}</p>}
+        <hr className="settings-divider" />
         <button
           type="button"
           className={`btn-delete settings-clear-btn${confirmingClear ? " is-confirming" : ""}`}
@@ -258,11 +287,8 @@ export function SettingsPanel({ onClearAllData, onExportData, onImportData }: Se
             Cancel
           </button>
         )}
-        <p className="settings-hint">
-          Backup includes your entries, settings and corrections. Restoring replaces everything — a copy of your
-          current data is downloaded first.
-        </p>
       </section>
+      </div>
       </div>
     </section>
   );

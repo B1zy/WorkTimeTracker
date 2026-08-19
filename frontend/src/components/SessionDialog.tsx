@@ -213,6 +213,7 @@ function SessionForm({ state, onClose }: SessionFormProps) {
           <input
             id="start-input"
             type="time"
+            lang="en-GB"
             step={1}
             required
             value={start}
@@ -225,6 +226,7 @@ function SessionForm({ state, onClose }: SessionFormProps) {
             id="end-input"
             ref={endInputRef}
             type="time"
+            lang="en-GB"
             step={1}
             required
             value={end}
