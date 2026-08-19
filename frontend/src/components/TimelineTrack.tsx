@@ -1,6 +1,7 @@
-import { useRef } from "react";
+import { useMemo, useRef } from "react";
 import type { WorkSession } from "../types/WorkSession";
 import { useDragToSelect } from "../hooks/useDragToSelect";
+import { timeStringToMinutes } from "../utils/dateUtils";
 import { minutesToPercent } from "../utils/timelineLayout";
 import { TimelineBlock } from "./TimelineBlock";
 
@@ -28,7 +29,19 @@ export function TimelineTrack({
   const trackRef = useRef<HTMLDivElement>(null);
   const ghostRef = useRef<HTMLDivElement>(null);
 
-  const { onPointerDown } = useDragToSelect(trackRef, ghostRef, onTrackClick, rangeStartMin, rangeEndMin);
+  const sessionIntervals = useMemo(
+    () => sessions.map((s) => ({ start: timeStringToMinutes(s.start), end: timeStringToMinutes(s.end) })),
+    [sessions]
+  );
+
+  const { onPointerDown } = useDragToSelect(
+    trackRef,
+    ghostRef,
+    onTrackClick,
+    rangeStartMin,
+    rangeEndMin,
+    sessionIntervals
+  );
 
   // Hidden rather than clamped to the edge when "now" falls outside the
   // visible timebar range (e.g. a Timebar range setting of 8-18h, checked

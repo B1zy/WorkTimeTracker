@@ -141,15 +141,17 @@ function App() {
     let candidate = { ...session, start: newStart, end: newEnd };
 
     if (hasOverlap(candidate, session.id)) {
-      // Rather than reverting all the way back to where the drag started,
-      // slide the block to just touch the nearest blocking edge.
+      // The live drag already keeps the block collision-free as you move it
+      // (see useDragToMove), so this is mainly a safety net for a sibling
+      // that changed underneath the drag (e.g. a concurrent edit) -- rather
+      // than reverting all the way back to where the drag started, slide the
+      // block to just touch the nearest blocking edge.
       const siblings = (sessionsByDate[session.date] ?? [])
         .filter((s) => s.id !== session.id)
         .map((s) => ({ start: timeStringToMinutes(s.start), end: timeStringToMinutes(s.end) }));
       const snapped = snapToNearestFreeSlot(
         timeStringToMinutes(newStart),
         timeStringToMinutes(newEnd) - timeStringToMinutes(newStart),
-        timeStringToMinutes(session.start),
         siblings,
         settings.timelineStartMin,
         settings.timelineEndMin

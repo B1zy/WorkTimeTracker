@@ -75,27 +75,37 @@ export function nearestRightBoundary(endMins: number, siblings: MinuteInterval[]
 }
 
 // When a dragged move overlaps another session, slide it just up against the
-// nearest blocking edge in the direction it was dragged (rather than
-// reverting all the way back to where it started). Returns null if no valid
-// slot exists in that direction (e.g. wedged between two other sessions with
-// no room left).
+// nearest blocking edge -- which edge is decided by which side of the
+// blocker the drop is actually closer to (comparing midpoints), not by which
+// direction the drag originally came from. That's what makes a drop that
+// only grazes one edge snap right back to that same edge instead of flying
+// to the blocker's far side. Once a direction is picked it's held for the
+// rest of the chain (if sliding past one blocker lands on another), so a
+// tightly packed run of sessions still resolves by sliding one consistent
+// way rather than bouncing back and forth. Returns null if no valid slot
+// exists in that direction (e.g. wedged between two other sessions with no
+// room left).
 export function snapToNearestFreeSlot(
   candidateStartMins: number,
   durationMins: number,
-  originalStartMins: number,
   siblings: MinuteInterval[],
   rangeStartMin: number = ABS_DAY_START_MIN,
   rangeEndMin: number = ABS_DAY_END_MIN
 ): MinuteInterval | null {
   let start = candidateStartMins;
-  const movingRight = start > originalStartMins;
   const sorted = [...siblings].sort((a, b) => a.start - b.start);
+  let pushRight: boolean | null = null;
 
   for (let guard = 0; guard <= sorted.length; guard++) {
     const end = start + durationMins;
     const blocker = sorted.find((iv) => start < iv.end && iv.start < end);
     if (!blocker) break;
-    start = movingRight ? blocker.end : blocker.start - durationMins;
+    if (pushRight === null) {
+      const candidateCenter = candidateStartMins + durationMins / 2;
+      const blockerCenter = (blocker.start + blocker.end) / 2;
+      pushRight = candidateCenter >= blockerCenter;
+    }
+    start = pushRight ? blocker.end : blocker.start - durationMins;
   }
 
   const end = start + durationMins;

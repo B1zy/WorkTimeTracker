@@ -7,7 +7,7 @@ import {
 } from "../utils/entryTypeCounting";
 import { WEEKDAY_DISPLAY_ORDER, WEEKDAY_LABEL, type Weekday } from "../utils/workweek";
 import { ENTRY_TYPE_LABEL } from "../utils/timelineLayout";
-import { timeStringToMinutes } from "../utils/dateUtils";
+import { TimeField } from "./TimeField";
 import type { EntryType } from "../types/WorkSession";
 
 const ENTRY_TYPES: EntryType[] = ["Working", "Sick", "OvertimeCompensation", "Appointment", "Lunch"];
@@ -20,17 +20,6 @@ const SETTINGS_ENTRY_TYPE_LABEL: Partial<Record<EntryType, string>> = {
 };
 
 const DAY_MINUTES = 24 * 60;
-
-// <input type="time"> can't represent "24:00" (valid range is 00:00-23:59),
-// so the display clamps to 23:59 for that one boundary value. The stored
-// minutes are untouched -- this only affects what the picker shows until the
-// user actually changes it.
-function minutesToTimeInputValue(mins: number): string {
-  const clamped = Math.min(Math.max(Math.round(mins), 0), DAY_MINUTES - 1);
-  const h = Math.floor(clamped / 60);
-  const m = clamped % 60;
-  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
-}
 
 interface SettingsPanelProps {
   onClearAllData: () => Promise<void>;
@@ -58,17 +47,11 @@ export function SettingsPanel({ onClearAllData, onExportData, onImportData }: Se
     updateSettings((prev) => ({ ...prev, weeklyTargetMinutes: Math.round(hours * 60) }));
   }
 
-  function handleTimelineStartChange(event: ChangeEvent<HTMLInputElement>) {
-    const value = event.target.value;
-    if (!value) return;
-    const mins = timeStringToMinutes(value);
+  function handleTimelineStartChange(mins: number) {
     updateSettings((prev) => ({ ...prev, timelineStartMin: Math.min(mins, prev.timelineEndMin - 60) }));
   }
 
-  function handleTimelineEndChange(event: ChangeEvent<HTMLInputElement>) {
-    const value = event.target.value;
-    if (!value) return;
-    const mins = timeStringToMinutes(value);
+  function handleTimelineEndChange(mins: number) {
     updateSettings((prev) => ({ ...prev, timelineEndMin: Math.max(mins, prev.timelineStartMin + 60) }));
   }
 
@@ -214,22 +197,20 @@ export function SettingsPanel({ onClearAllData, onExportData, onImportData }: Se
       <section className="settings-section">
         <h3 className="settings-section-title">Timebar range</h3>
         <div className="settings-time-range-row">
-          <input
+          <TimeField
             id="timeline-start-input"
-            type="time"
-            lang="en-GB"
-            value={minutesToTimeInputValue(settings.timelineStartMin)}
+            value={settings.timelineStartMin}
             onChange={handleTimelineStartChange}
-            aria-label="Starts at"
+            ariaLabel="Starts at"
+            compact
           />
           <span className="settings-time-range-to">to</span>
-          <input
+          <TimeField
             id="timeline-end-input"
-            type="time"
-            lang="en-GB"
-            value={minutesToTimeInputValue(settings.timelineEndMin)}
+            value={settings.timelineEndMin}
             onChange={handleTimelineEndChange}
-            aria-label="Ends at"
+            ariaLabel="Ends at"
+            compact
           />
         </div>
         <div className="settings-time-range-preview">

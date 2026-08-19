@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import type { SessionDialogState } from "../hooks/useSessionDialog";
 import type { EntryType, NewWorkSession, WorkLocation } from "../types/WorkSession";
-import { formatDayHeaderLabel } from "../utils/dateUtils";
-import { ENTRY_TYPE_LABEL } from "../utils/timelineLayout";
+import { formatDayHeaderLabel, timeStringToMinutes } from "../utils/dateUtils";
+import { ENTRY_TYPE_LABEL, minsToTimeStr } from "../utils/timelineLayout";
+import { TimeField } from "./TimeField";
 
 const ENTRY_TYPES: EntryType[] = ["Working", "Sick", "OvertimeCompensation", "Appointment", "Lunch"];
 
@@ -96,9 +97,9 @@ function SessionForm({ state, onClose }: SessionFormProps) {
   const [start, setStart] = useState(initial.start);
   const [end, setEnd] = useState(initial.end);
   const [saving, setSaving] = useState(false);
+  const [endError, setEndError] = useState<string | null>(null);
 
   const nameInputRef = useRef<HTMLInputElement>(null);
-  const endInputRef = useRef<HTMLInputElement>(null);
   // Tracks whether the user has typed a custom name, so switching Type keeps
   // syncing the default name (the type label) until they make it their own.
   const nameTouchedRef = useRef(isEdit);
@@ -121,7 +122,7 @@ function SessionForm({ state, onClose }: SessionFormProps) {
   }, []);
 
   useEffect(() => {
-    endInputRef.current?.setCustomValidity("");
+    setEndError(null);
   }, [start, end]);
 
   const dateIso = isEdit ? state.session.date : state.dateIso;
@@ -131,11 +132,10 @@ function SessionForm({ state, onClose }: SessionFormProps) {
     event.preventDefault();
 
     if (start && end && end <= start) {
-      endInputRef.current?.setCustomValidity("End time must be after start time.");
-      endInputRef.current?.reportValidity();
+      setEndError("End time must be after start time.");
       return;
     }
-    endInputRef.current?.setCustomValidity("");
+    setEndError(null);
 
     const session: NewWorkSession = { name, description, location, entryType, date: dateIso, start, end };
 
@@ -209,29 +209,23 @@ function SessionForm({ state, onClose }: SessionFormProps) {
 
       <div className="form-row form-row-split">
         <div>
-          <label htmlFor="start-input">Start</label>
-          <input
+          <label htmlFor="start-input-hour">Start</label>
+          <TimeField
             id="start-input"
-            type="time"
-            lang="en-GB"
-            step={1}
-            required
-            value={start}
-            onChange={(e) => setStart(e.target.value)}
+            value={timeStringToMinutes(start)}
+            onChange={(mins) => setStart(minsToTimeStr(mins))}
+            ariaLabel="Start"
           />
         </div>
         <div>
-          <label htmlFor="end-input">End</label>
-          <input
+          <label htmlFor="end-input-hour">End</label>
+          <TimeField
             id="end-input"
-            ref={endInputRef}
-            type="time"
-            lang="en-GB"
-            step={1}
-            required
-            value={end}
-            onChange={(e) => setEnd(e.target.value)}
+            value={timeStringToMinutes(end)}
+            onChange={(mins) => setEnd(minsToTimeStr(mins))}
+            ariaLabel="End"
           />
+          {endError && <p className="field-error">{endError}</p>}
         </div>
       </div>
 

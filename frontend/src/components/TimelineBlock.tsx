@@ -59,6 +59,7 @@ export function TimelineBlock({
     leftPercent: left,
     rangeStartMin,
     rangeEndMin,
+    siblings: siblingIntervals,
     onSessionClick,
     onSessionMove,
   });

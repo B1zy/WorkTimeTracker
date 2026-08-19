@@ -4,7 +4,13 @@
 
 import { useCallback, type PointerEvent as ReactPointerEvent, type RefObject } from "react";
 import { formatTimeShort } from "../utils/dateUtils";
-import { minsToTimeStr, snapMinutesTo5 } from "../utils/timelineLayout";
+import {
+  minsToTimeStr,
+  nearestLeftBoundary,
+  nearestRightBoundary,
+  snapMinutesTo5,
+  type MinuteInterval,
+} from "../utils/timelineLayout";
 import { useDragTooltip } from "./useDragTooltip";
 import { beginPointerDrag } from "./pointerDrag";
 
@@ -13,7 +19,13 @@ export function useDragToSelect(
   ghostRef: RefObject<HTMLDivElement | null>,
   onTrackClick: (startTime: string, endTime: string | null) => void,
   rangeStartMin: number,
-  rangeEndMin: number
+  rangeEndMin: number,
+  // Existing sessions for the day, as minute intervals -- the drag is
+  // clamped to whichever gap between them the pointer went down in, so
+  // dragging "through" a neighbor stops at its edge instead of creating an
+  // overlap. Makes inserting e.g. a lunch break between two Working blocks a
+  // single quick drag instead of a pixel-precise one.
+  siblings: MinuteInterval[]
 ) {
   const { showTooltip, hideTooltip } = useDragTooltip();
 
@@ -44,7 +56,31 @@ export function useDragToSelect(
       const track = trackRef.current;
       if (!track) return;
 
-      const dragStart = fractionFromEvent(event);
+      let dragStart = fractionFromEvent(event);
+      let dragStartMins = minsFromFraction(dragStart, false);
+
+      // The block itself covers only the middle of the track's height
+      // (top/bottom 5px are its move-drag hit target, not the block), so a
+      // press can land on the track element while still falling inside an
+      // existing session's time span. Snap the anchor to that session's
+      // nearer edge instead of starting the drag from inside it -- the same
+      // "snap to the nearest edge" rule an overlapping move already gets.
+      const containing = siblings.find((s) => s.start <= dragStartMins && dragStartMins < s.end);
+      if (containing) {
+        dragStartMins =
+          dragStartMins - containing.start <= containing.end - dragStartMins ? containing.start : containing.end;
+        dragStart = (dragStartMins - rangeStartMin) / (rangeEndMin - rangeStartMin);
+      }
+
+      // The free gap the anchor point fell in -- empty track everywhere
+      // (rangeStartMin/rangeEndMin) if there are no siblings that day.
+      const gapStartMin = nearestLeftBoundary(dragStartMins, siblings, rangeStartMin);
+      const gapEndMin = nearestRightBoundary(dragStartMins, siblings, rangeEndMin);
+      const gapStartFrac = (gapStartMin - rangeStartMin) / (rangeEndMin - rangeStartMin);
+      const gapEndFrac = (gapEndMin - rangeStartMin) / (rangeEndMin - rangeStartMin);
+      const clampFrac = (fraction: number) => Math.max(gapStartFrac, Math.min(gapEndFrac, fraction));
+      const clampMins = (mins: number) => Math.max(gapStartMin, Math.min(gapEndMin, mins));
+
       const ghost = ghostRef.current;
       if (ghost) {
         ghost.hidden = false;
@@ -59,7 +95,7 @@ export function useDragToSelect(
 
       beginPointerDrag(track, event.pointerId, {
         onMove(moveEvent) {
-          const current = fractionFromEvent(moveEvent);
+          const current = clampFrac(fractionFromEvent(moveEvent));
           const left = Math.min(dragStart, current);
           const width = Math.abs(current - dragStart);
           if (ghost) {
@@ -67,8 +103,8 @@ export function useDragToSelect(
             ghost.style.width = `${width * 100}%`;
           }
 
-          const startMins = minsFromFraction(left, moveEvent.ctrlKey);
-          const endMins = minsFromFraction(left + width, moveEvent.ctrlKey);
+          const startMins = clampMins(minsFromFraction(left, moveEvent.ctrlKey));
+          const endMins = clampMins(minsFromFraction(left + width, moveEvent.ctrlKey));
           showTooltip(
             `${formatTimeShort(minsToTimeStr(startMins))} – ${formatTimeShort(minsToTimeStr(endMins))}`,
             moveEvent.clientX,
@@ -79,12 +115,12 @@ export function useDragToSelect(
         onEnd(upEvent) {
           hideGhost();
 
-          const endFrac = fractionFromEvent(upEvent);
+          const endFrac = clampFrac(fractionFromEvent(upEvent));
           const startFrac = Math.min(dragStart, endFrac);
           const stopFrac = Math.max(dragStart, endFrac);
 
-          const startMins = minsFromFraction(startFrac, upEvent.ctrlKey);
-          const endMins = minsFromFraction(stopFrac, upEvent.ctrlKey);
+          const startMins = clampMins(minsFromFraction(startFrac, upEvent.ctrlKey));
+          const endMins = clampMins(minsFromFraction(stopFrac, upEvent.ctrlKey));
 
           // A drag shorter than 5 minutes is treated as a plain click: only the
           // start time is pre-filled and the modal calculates end = start + 1h.
@@ -98,7 +134,7 @@ export function useDragToSelect(
         onCancel: hideGhost,
       });
     },
-    [trackRef, ghostRef, fractionFromEvent, minsFromFraction, showTooltip, hideTooltip, onTrackClick]
+    [trackRef, ghostRef, fractionFromEvent, minsFromFraction, showTooltip, hideTooltip, onTrackClick, siblings, rangeStartMin, rangeEndMin]
   );
 
   return { onPointerDown };

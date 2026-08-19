@@ -1,11 +1,16 @@
 // Drag-to-move: repositions an existing session block, preserving its
 // duration. The block's position is mutated directly via its ref during the
-// drag (not React state), matching useDragToSelect's approach.
+// drag (not React state), matching useDragToSelect's approach. Clamped in
+// real time against sibling sessions (like resize already was) so the block
+// can never be dragged into visual overlap in the first place -- what you
+// see mid-drag is always a valid drop position, so there's no separate
+// "oops, that overlapped, let me guess where you meant" correction after
+// release that could guess wrong.
 
 import { useCallback, useRef, type PointerEvent as ReactPointerEvent, type RefObject } from "react";
 import type { WorkSession } from "../types/WorkSession";
 import { formatTimeShort } from "../utils/dateUtils";
-import { minsToTimeStr, minutesToPercent } from "../utils/timelineLayout";
+import { minsToTimeStr, minutesToPercent, snapToNearestFreeSlot, type MinuteInterval } from "../utils/timelineLayout";
 import { useDragTooltip } from "./useDragTooltip";
 import { beginPointerDrag } from "./pointerDrag";
 
@@ -24,6 +29,7 @@ interface UseDragToMoveOptions {
   leftPercent: number;
   rangeStartMin: number;
   rangeEndMin: number;
+  siblings: MinuteInterval[];
   onSessionClick: (session: WorkSession) => void;
   onSessionMove: (session: WorkSession, newStart: string, newEnd: string) => Promise<boolean>;
 }
@@ -37,6 +43,7 @@ export function useDragToMove({
   leftPercent,
   rangeStartMin,
   rangeEndMin,
+  siblings,
   onSessionClick,
   onSessionMove,
 }: UseDragToMoveOptions) {
@@ -71,16 +78,22 @@ export function useDragToMove({
           if (!track || !block) return;
           const rect = track.getBoundingClientRect();
           const deltaMins = (deltaX / rect.width) * (rangeEndMin - rangeStartMin);
-          let newStart = Math.round(startMins + deltaMins);
-          newStart = Math.min(Math.max(newStart, rangeStartMin), rangeEndMin - blockDuration);
-          const newEnd = newStart + blockDuration;
-          pendingStart = newStart;
-          pendingEnd = newEnd;
+          let rawStart = Math.round(startMins + deltaMins);
+          rawStart = Math.min(Math.max(rawStart, rangeStartMin), rangeEndMin - blockDuration);
 
-          block.style.left = `${minutesToPercent(newStart, rangeStartMin, rangeEndMin)}%`;
+          // Resolve against siblings on every move, not just at drop -- the
+          // block visually can't overlap another session even mid-drag, so
+          // there's nothing left to correct once the pointer comes up.
+          const resolved = snapToNearestFreeSlot(rawStart, blockDuration, siblings, rangeStartMin, rangeEndMin);
+          if (!resolved) return; // wedged with no room in this direction; hold the last valid spot
+
+          pendingStart = resolved.start;
+          pendingEnd = resolved.end;
+
+          block.style.left = `${minutesToPercent(resolved.start, rangeStartMin, rangeEndMin)}%`;
           block.classList.add("timeline-block-dragging");
           showTooltip(
-            `${formatTimeShort(minsToTimeStr(newStart))} – ${formatTimeShort(minsToTimeStr(newEnd))}`,
+            `${formatTimeShort(minsToTimeStr(resolved.start))} – ${formatTimeShort(minsToTimeStr(resolved.end))}`,
             moveEvent.clientX,
             moveEvent.clientY
           );
@@ -120,6 +133,7 @@ export function useDragToMove({
       leftPercent,
       rangeStartMin,
       rangeEndMin,
+      siblings,
       onSessionMove,
       showTooltip,
       hideTooltip,

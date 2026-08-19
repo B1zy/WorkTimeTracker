@@ -902,14 +902,174 @@ select {
   font-size: 0.95rem;
   font-family: var(--font-sans);
 }
-#start-input,
-#end-input {
-  font-family: var(--font-mono);
-}
 input:focus,
 select:focus {
   outline: 2px solid var(--accent);
   outline-offset: 1px;
+}
+
+/* Custom 24h time control (TimeField) -- two digit segments styled as one
+   field, standing in for <input type="time"> everywhere in the app. Same
+   surface/border language as a normal input/select, just split down the
+   middle by the colon. A picker button on the right opens a menu of exact
+   hour/minute values (see .time-field-popover below) so jumping to a
+   specific time doesn't mean clicking a spinner arrow dozens of times. */
+.time-field {
+  position: relative;
+  display: inline-flex;
+  align-items: stretch;
+  background: var(--surface-raised);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  padding: 0 2px;
+}
+.time-field:focus-within {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+.time-field-unit {
+  display: flex;
+  align-items: center;
+}
+/* Fixed pixel width (not e.g. "2ch") so two mono digits always have room
+   regardless of the inherited box-sizing: border-box padding -- a char-unit
+   width was clipping the second digit in the compact variant. */
+.time-field-segment {
+  width: 24px;
+  border: none;
+  background: transparent;
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: 0.95rem;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+  padding: 8px 0;
+  border-radius: 2px;
+  cursor: default;
+}
+.time-field-segment:focus {
+  outline: none;
+  background: var(--accent);
+  color: var(--text-on-accent);
+}
+.time-field-colon {
+  align-self: center;
+  color: var(--text-dim);
+  font-family: var(--font-mono);
+  font-weight: 700;
+}
+/* Picker button -- sits at the right edge of the field, opens the exact-time
+   menu. Same transparent/hover-tint language as other in-field icon buttons
+   in this app (e.g. .correction-btn-icon). */
+.time-field-picker-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  align-self: stretch;
+  width: 22px;
+  margin-left: 1px;
+  padding: 0;
+  border: none;
+  border-left: 1px solid var(--border);
+  border-radius: 0 2px 2px 0;
+  background: transparent;
+  color: var(--text-dim);
+  cursor: pointer;
+}
+.time-field-picker-btn:hover {
+  background: var(--border);
+  color: var(--accent);
+}
+.time-field-picker-btn:active {
+  transform: scale(0.92);
+}
+.time-field-picker-btn.is-open {
+  background: var(--accent);
+  border-left-color: var(--accent);
+  color: var(--text-on-accent);
+}
+
+/* Exact hour/minute menu -- two scrollable columns of clickable values,
+   floating below the field like .correction-popover so it reads as a
+   detached menu rather than the field itself changing shape. */
+.time-field-popover {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  z-index: 30;
+  /* Hidden until the JS position pass (see TimeField's useLayoutEffect)
+     swaps this to fixed viewport coordinates and flips it back to visible --
+     keeps the pre-measurement fallback position from ever flashing. */
+  visibility: hidden;
+  display: flex;
+  gap: 6px;
+  background: var(--surface-raised);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-lg);
+  padding: 8px;
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.55);
+  animation: correction-popover-in 0.14s ease-out;
+}
+.time-field-popover-col {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 5px;
+  width: 46px;
+}
+.time-field-popover-heading {
+  font-family: var(--font-display);
+  font-size: 0.62rem;
+  font-weight: 700;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  text-align: center;
+}
+.time-field-popover-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 176px;
+  overflow-y: auto;
+  padding-right: 2px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-strong) transparent;
+}
+.time-field-popover-item {
+  flex-shrink: 0;
+  padding: 5px 0;
+  border: none;
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+  cursor: pointer;
+}
+.time-field-popover-item:hover {
+  background: var(--border);
+}
+.time-field-popover-item.is-selected {
+  background: var(--accent);
+  color: var(--text-on-accent);
+  font-weight: 700;
+}
+/* The compact variant used in Settings' Timebar range, where the field sits
+   beside a live preview bar rather than in a full-size form row. */
+.time-field-compact .time-field-segment {
+  width: 20px;
+  font-size: 0.8rem;
+  padding: 5px 0;
+}
+.time-field-compact .time-field-picker-btn {
+  width: 18px;
+}
+.time-field-compact .time-field-picker-btn svg {
+  width: 11px;
+  height: 11px;
 }
 
 .dialog-actions {
@@ -1487,19 +1647,6 @@ select:focus {
   justify-content: space-between;
   gap: 8px;
 }
-.settings-time-range-row input[type="time"] {
-  flex: 0 0 auto;
-  width: 84px;
-  padding: 5px 6px;
-  font-family: var(--font-mono);
-  font-size: 0.8rem;
-}
-/* The browser's default clock-picker glyph renders near-black -- invert it
-   so it's visible against this dark theme. */
-.settings-time-range-row input[type="time"]::-webkit-calendar-picker-indicator {
-  filter: invert(0.8);
-  cursor: pointer;
-}
 .settings-time-range-to {
   flex-shrink: 0;
   font-family: var(--font-display);
@@ -1874,6 +2021,14 @@ select:focus {
   padding: 10px 14px;
   margin-bottom: 16px;
   font-size: 0.85rem;
+}
+
+/* Inline, field-scoped version of the same signal -- e.g. "end before
+   start" under the End time field, rather than a full banner. */
+.field-error {
+  margin: 4px 0 0;
+  font-size: 0.7rem;
+  color: var(--state-over);
 }
 
 /* --- Motion ---
