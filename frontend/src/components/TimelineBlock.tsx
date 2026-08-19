@@ -88,6 +88,14 @@ export function TimelineBlock({
     onSessionMove,
   });
 
+  // Labels degrade by the session's actual duration, not by how wide it
+  // happens to render -- a 55m lunch break should read the same whether the
+  // visible timebar range is 8h or 24h. Full name+duration needs room for
+  // both lines; duration-only still needs to fit a few centered characters;
+  // anything shorter than that is too tight for any text at all.
+  const totalMinutes = durationMinutes(session.start, session.end);
+  const labelTier = totalMinutes >= 150 ? "full" : totalMinutes >= 80 ? "duration" : "bare";
+
   const entryTypeClass = ENTRY_TYPE_CLASS[session.entryType];
   const colorClass = entryTypeClass ?? LOCATION_CLASS[session.location] ?? "loc-other";
   const typeLabel = ENTRY_TYPE_LABEL[session.entryType] ?? session.entryType;
@@ -112,7 +120,7 @@ export function TimelineBlock({
     <button
       ref={blockRef}
       type="button"
-      className={`timeline-block ${colorClass}${countingClass}`}
+      className={`timeline-block ${colorClass}${countingClass} label-${labelTier}`}
       style={{ left: `${left}%`, width: `${width}%` }}
       title={title}
       aria-label={title}
@@ -128,11 +136,16 @@ export function TimelineBlock({
         onClick={stopResizeHandleClick}
         aria-hidden="true"
       />
-      <span className="block-name-row">
-        <span className="block-name">{session.name}</span>
-        <span className="block-time">{formatDuration(durationMinutes(session.start, session.end))}</span>
-      </span>
-      {session.description && <span className="block-desc">{session.description}</span>}
+      {labelTier === "full" && (
+        <>
+          <span className="block-name-row">
+            <span className="block-name">{session.name}</span>
+            <span className="block-time">{formatDuration(totalMinutes)}</span>
+          </span>
+          {session.description && <span className="block-desc">{session.description}</span>}
+        </>
+      )}
+      {labelTier === "duration" && <span className="block-duration-only">{formatDuration(totalMinutes)}</span>}
       <span
         className="timeline-resize-handle timeline-resize-handle-end"
         onPointerDown={onResizeEndPointerDown}

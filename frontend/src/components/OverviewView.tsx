@@ -179,51 +179,47 @@ export function OverviewView({ onClearAllData, onExportData, onImportData }: Ove
   const weekdayMax = Math.max(dayTarget * 1.05, ...weekdayBars.map((w) => w.average));
   const weekdayTargetLinePercent = Math.min((dayTarget / weekdayMax) * 100, 100);
 
-  // Recent-weeks line chart: the bar chart above already covers the full
-  // year (and the total), so this is deliberately just the last quarter --
-  // and, since the total is already up there, this one breaks that same
-  // window down by session type instead of repeating it. Ends at the current
-  // week (or the year's last tracked week, for a moment right at a year
-  // boundary).
+  // Recent-weeks window: the bar chart above already covers the full year
+  // (and the total), so this is deliberately just the last quarter -- and,
+  // since the total is already up there, this breaks that same window down
+  // by session type instead of repeating it. Ends at the current week (or
+  // the year's last tracked week, for a moment right at a year boundary).
   const recentWeeks = useMemo(() => {
     const endIndex = currentWeekIndex >= 0 ? currentWeekIndex : weekTotals.length - 1;
     const startIndex = Math.max(0, endIndex - RECENT_WEEK_COUNT + 1);
-    return weeks.slice(startIndex, endIndex + 1).map((week) => ({
-      weekStart: week[0],
-      // Raw (un-weighted) minutes per entry type -- the composition of the
-      // week, not the counted total the bar chart above already shows.
-      byType: CHART_ENTRY_TYPES.reduce((acc, type) => {
-        acc[type] = week.reduce((sum, day) => sum + (minutesByDateAndType[toISODate(day)]?.[type] ?? 0), 0);
-        return acc;
-      }, {} as Record<EntryType, number>),
-    }));
-  }, [weeks, currentWeekIndex, weekTotals.length, minutesByDateAndType]);
+    return weeks.slice(startIndex, endIndex + 1);
+  }, [weeks, currentWeekIndex, weekTotals.length]);
 
-  // Only chart types that actually occurred in this window -- a flat zero
-  // line for a type nobody logged would just be legend noise.
-  const activeChartTypes = useMemo(
-    () => CHART_ENTRY_TYPES.filter((type) => recentWeeks.some((w) => w.byType[type] > 0)),
-    [recentWeeks]
-  );
+  // Raw (un-weighted) minutes per entry type, summed across the whole
+  // window -- the composition of the period, not the counted total the bar
+  // chart above already shows.
+  const typeTotals = useMemo(() => {
+    const totals = CHART_ENTRY_TYPES.reduce((acc, type) => ({ ...acc, [type]: 0 }), {} as Record<EntryType, number>);
+    for (const week of recentWeeks) {
+      for (const day of week) {
+        const byType = minutesByDateAndType[toISODate(day)];
+        if (!byType) continue;
+        for (const type of CHART_ENTRY_TYPES) {
+          totals[type] += byType[type] ?? 0;
+        }
+      }
+    }
+    return totals;
+  }, [recentWeeks, minutesByDateAndType]);
 
-  const lineChartWidth = 220;
-  const lineChartHeight = 56;
-  const typeChartMax = Math.max(1, ...recentWeeks.flatMap((w) => activeChartTypes.map((type) => w.byType[type])));
-  const typeLines = activeChartTypes.map((type) => {
-    const n = recentWeeks.length;
-    const points = recentWeeks.map((w, i) => ({
-      x: n > 1 ? (i / (n - 1)) * lineChartWidth : lineChartWidth / 2,
-      y: lineChartHeight - (w.byType[type] / typeChartMax) * lineChartHeight,
-      minutes: w.byType[type],
-      weekStart: w.weekStart,
-    }));
-    return {
-      type,
-      color: entryTypeColor[type],
-      path: points.map((p, i) => `${i === 0 ? "M" : "L"}${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(" "),
-      points,
-    };
-  });
+  // Only chart types that actually occurred in this window -- a zero-width
+  // segment for a type nobody logged would just be clutter.
+  const activeChartTypes = CHART_ENTRY_TYPES.filter((type) => typeTotals[type] > 0);
+  const typeGrandTotal = activeChartTypes.reduce((sum, type) => sum + typeTotals[type], 0);
+  // Segments of one 100%-wide bar (the window's total tracked time), not
+  // separate bars each scaled to their own max -- share of the whole is the
+  // point, not a type-to-type size comparison.
+  const typeBars = activeChartTypes.map((type) => ({
+    type,
+    color: entryTypeColor[type],
+    minutes: typeTotals[type],
+    sharePercent: typeGrandTotal > 0 ? (typeTotals[type] / typeGrandTotal) * 100 : 0,
+  }));
 
   return (
     <div className="overview-page">
@@ -328,45 +324,26 @@ export function OverviewView({ onClearAllData, onExportData, onImportData }: Ove
             </div>
           </div>
 
-          <div className="overview-secondary-chart overview-line-chart-col">
+          <div className="overview-secondary-chart overview-type-stack-col">
             <h3 className="overview-section-title overview-section-title-spaced">
               Last {recentWeeks.length} weeks by type
             </h3>
-            <svg
-              className="overview-line-chart"
-              viewBox={`0 0 ${lineChartWidth} ${lineChartHeight}`}
-              preserveAspectRatio="none"
-              role="img"
-              aria-label={`Weekly hours by session type over the last ${recentWeeks.length} weeks`}
-            >
-              {typeLines.map(
-                ({ type, color, path, points }) =>
-                  points.length > 1 && <path key={type} className="overview-line-path" style={{ stroke: color }} d={path} />
-              )}
-              {typeLines.map(({ type, color, points }) =>
-                points.map((p) => (
-                  <circle
-                    key={`${type}-${p.weekStart.toISOString()}`}
-                    className="overview-line-dot"
-                    style={{ fill: color }}
-                    cx={p.x}
-                    cy={p.y}
-                    r={2.2}
-                  >
-                    <title>
-                      {ENTRY_TYPE_LABEL[type]} · Week of{" "}
-                      {p.weekStart.toLocaleDateString(undefined, { month: "short", day: "numeric" })} —{" "}
-                      {p.minutes > 0 ? formatDuration(p.minutes) : "No entries"}
-                    </title>
-                  </circle>
-                ))
-              )}
-            </svg>
-            <div className="overview-type-legend">
-              {activeChartTypes.map((type) => (
-                <span key={type} className="overview-type-legend-item">
-                  <span className="overview-type-legend-dot" style={{ background: entryTypeColor[type] }} />
-                  {ENTRY_TYPE_LABEL[type]}
+            {/* One 100%-wide bar, segmented by type -- not one bar per type. */}
+            <div className="overview-type-stack-track">
+              {typeBars.map(({ type, color, minutes, sharePercent }) => (
+                <div
+                  key={type}
+                  className="overview-type-stack-segment"
+                  style={{ width: `${sharePercent}%`, background: color }}
+                  title={`${ENTRY_TYPE_LABEL[type]} — ${formatDuration(minutes)} (${sharePercent.toFixed(0)}%)`}
+                />
+              ))}
+            </div>
+            <div className="overview-type-stack-legend">
+              {typeBars.map(({ type, color, minutes, sharePercent }) => (
+                <span key={type} className="overview-type-stack-legend-item">
+                  <span className="overview-type-bar-dot" style={{ background: color }} />
+                  {ENTRY_TYPE_LABEL[type]} · {formatDuration(minutes)} · {sharePercent.toFixed(0)}%
                 </span>
               ))}
             </div>

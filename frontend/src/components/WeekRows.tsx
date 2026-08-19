@@ -1,5 +1,6 @@
 import type { WorkSession } from "../types/WorkSession";
 import { toISODate } from "../utils/dateUtils";
+import { useNow } from "../hooks/useNow";
 import { DayRow } from "./DayRow";
 
 interface WeekRowsProps {
@@ -12,17 +13,26 @@ interface WeekRowsProps {
 }
 
 export function WeekRows({ weekDays, sessionsByDate, ...callbacks }: WeekRowsProps) {
+  // One shared live clock for the whole week, rather than one timer per day
+  // row -- only the row matching todayIso ever uses nowMinutes.
+  const { nowMinutes, todayIso } = useNow();
+
   return (
     <main className="week-rows">
-      {weekDays.map((date, index) => (
-        <DayRow
-          key={toISODate(date)}
-          date={date}
-          sessions={sessionsByDate[toISODate(date)] ?? []}
-          index={index}
-          {...callbacks}
-        />
-      ))}
+      {weekDays.map((date, index) => {
+        const iso = toISODate(date);
+        return (
+          <DayRow
+            key={iso}
+            date={date}
+            sessions={sessionsByDate[iso] ?? []}
+            index={index}
+            isToday={iso === todayIso}
+            nowMinutes={nowMinutes}
+            {...callbacks}
+          />
+        );
+      })}
     </main>
   );
 }

@@ -12,6 +12,8 @@ interface DayRowProps {
   date: Date;
   sessions: WorkSession[];
   index: number;
+  isToday: boolean;
+  nowMinutes: number;
   onAddClick: (dateIso: string, dateObj: Date, startTime?: string | null, endTime?: string | null) => void;
   onSessionClick: (session: WorkSession) => void;
   onSessionMove: (session: WorkSession, newStart: string, newEnd: string) => Promise<boolean>;
@@ -22,6 +24,8 @@ export function DayRow({
   date,
   sessions,
   index,
+  isToday,
+  nowMinutes,
   onAddClick,
   onSessionClick,
   onSessionMove,
@@ -37,7 +41,7 @@ export function DayRow({
   );
 
   return (
-    <div className="day-row" style={{ "--row-index": index } as CSSProperties}>
+    <div className={`day-row${isToday ? " is-today" : ""}`} style={{ "--row-index": index } as CSSProperties}>
       <div className="day-row-header">
         <div className="weekday">{formatWeekdayShort(date)}</div>
         <div className="date">{formatDayShort(date)}</div>
@@ -49,6 +53,7 @@ export function DayRow({
           sessions={sessions}
           rangeStartMin={settings.timelineStartMin}
           rangeEndMin={settings.timelineEndMin}
+          nowMinutes={isToday ? nowMinutes : null}
           onSessionClick={onSessionClick}
           onTrackClick={(startTime, endTime) => onAddClick(iso, date, startTime, endTime)}
           onSessionMove={onSessionMove}

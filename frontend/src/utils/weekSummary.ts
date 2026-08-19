@@ -29,15 +29,21 @@ export function dayTargetLabel(weekTargetMinutes: number, workdayCount: number):
   return `${(dayTargetMinutes(weekTargetMinutes, workdayCount) / 60).toFixed(1)}h`;
 }
 
-// Color bands based on how far off a target we are:
-//   >50% deviation -> red ("over"), >25% -> orange ("under"), else -> green ("target").
+// Color bands based on how far off a target we are, and in which direction:
+//   >50% deviation:
+//     - short of target -> red ("over") -- the one real alarm signal.
+//     - past target      -> amber ("under") -- surplus hours aren't a problem
+//       the same way a shortfall is, so overshoot never escalates to red.
+//   >25% deviation (either direction) -> amber ("under").
+//   else -> green ("target").
 // Note "under"/"over" here name severity tiers, not direction -- a week (or
-// day) that's over target by 30% still gets the (orange) "under" tier,
+// day) that's *over* target by 30% still gets the (amber) "under" tier,
 // matching the original app's naming. Shared by the week summary and the
 // per-day total so both use identical color rules.
 export function classifySummaryState(actualMinutes: number, targetMinutes: number): SummaryState {
-  const deviation = Math.abs(actualMinutes - targetMinutes) / targetMinutes;
-  if (deviation > 0.5) return "over";
+  const diff = actualMinutes - targetMinutes;
+  const deviation = Math.abs(diff) / targetMinutes;
+  if (deviation > 0.5) return diff < 0 ? "over" : "under";
   if (deviation > 0.25) return "under";
   return "target";
 }
