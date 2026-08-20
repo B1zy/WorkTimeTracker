@@ -81,7 +81,10 @@ function SessionForm({ state, onClose }: SessionFormProps) {
     : (() => {
         const { start, end } = defaultTimes(state.startTime, state.endTime);
         return {
-          name: ENTRY_TYPE_LABEL.Working,
+          // Left blank rather than defaulted to the type label -- an unnamed
+          // session just shows its type on the timeline instead (see
+          // TimelineBlock's displayName), so there's nothing to pre-fill.
+          name: "",
           description: "",
           location: "InOffice" as WorkLocation,
           entryType: "Working" as EntryType,
@@ -100,19 +103,6 @@ function SessionForm({ state, onClose }: SessionFormProps) {
   const [endError, setEndError] = useState<string | null>(null);
 
   const nameInputRef = useRef<HTMLInputElement>(null);
-  // Tracks whether the user has typed a custom name, so switching Type keeps
-  // syncing the default name (the type label) until they make it their own.
-  const nameTouchedRef = useRef(isEdit);
-
-  function handleNameChange(value: string) {
-    nameTouchedRef.current = true;
-    setName(value);
-  }
-
-  function handleEntryTypeChange(value: EntryType) {
-    setEntryType(value);
-    if (!nameTouchedRef.current) setName(ENTRY_TYPE_LABEL[value]);
-  }
 
   useEffect(() => {
     nameInputRef.current?.focus();
@@ -170,9 +160,9 @@ function SessionForm({ state, onClose }: SessionFormProps) {
           id="name-input"
           ref={nameInputRef}
           type="text"
-          required
+          placeholder={ENTRY_TYPE_LABEL[entryType]}
           value={name}
-          onChange={(e) => handleNameChange(e.target.value)}
+          onChange={(e) => setName(e.target.value)}
         />
       </div>
 
@@ -189,7 +179,7 @@ function SessionForm({ state, onClose }: SessionFormProps) {
       <div className="form-row form-row-split">
         <div>
           <label htmlFor="type-input">Type</label>
-          <select id="type-input" value={entryType} onChange={(e) => handleEntryTypeChange(e.target.value as EntryType)}>
+          <select id="type-input" value={entryType} onChange={(e) => setEntryType(e.target.value as EntryType)}>
             {ENTRY_TYPES.map((t) => (
               <option key={t} value={t}>
                 {ENTRY_TYPE_LABEL[t]}

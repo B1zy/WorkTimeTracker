@@ -5,7 +5,7 @@ import { buildCalendarYearWeeks } from "../utils/calendar";
 import { formatDuration, getMonday, toISODate } from "../utils/dateUtils";
 import { ENTRY_TYPE_LABEL } from "../utils/timelineLayout";
 import { WEEKDAY_LABEL, workdayCount, workdayOffsets, type Weekday } from "../utils/workweek";
-import { classifySummaryState, dayTargetMinutes, meterMaxMinutes } from "../utils/weekSummary";
+import { classifySummaryState, classifyWeekdayAverageState, dayTargetMinutes, meterMaxMinutes } from "../utils/weekSummary";
 import type { EntryType } from "../types/WorkSession";
 import { SettingsPanel } from "./SettingsPanel";
 import { SettingsSidebar } from "./SettingsSidebar";
@@ -314,7 +314,7 @@ export function OverviewView({ onClearAllData, onExportData, onImportData }: Ove
                   <div className="overview-weekday-track">
                     <div className="overview-weekday-target-tick" style={{ left: `${weekdayTargetLinePercent}%` }} />
                     <div
-                      className={`overview-weekday-fill${tracked ? ` state-${classifySummaryState(average, dayTarget)}` : ""}`}
+                      className={`overview-weekday-fill${tracked ? ` state-${classifyWeekdayAverageState(average, dayTarget)}` : ""}`}
                       style={{ width: `${Math.min((average / weekdayMax) * 100, 100)}%` }}
                     />
                   </div>

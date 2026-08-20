@@ -1,12 +1,14 @@
 import type { CSSProperties } from "react";
 import type { WorkSession } from "../types/WorkSession";
 import { useSettings } from "../contexts/SettingsContext";
-import { formatDayShort, formatDuration, formatWeekdayShort, toISODate } from "../utils/dateUtils";
+import { useWeather } from "../contexts/WeatherContext";
+import { formatDayHeaderLabel, formatDayShort, formatDuration, formatWeekdayShort, toISODate } from "../utils/dateUtils";
 import { sumCountedMinutes } from "../utils/entryTypeCounting";
 import { workdayCount } from "../utils/workweek";
 import { classifySummaryState, dayTargetLabel, dayTargetMinutes } from "../utils/weekSummary";
 import { TimelineAxis } from "./TimelineAxis";
 import { TimelineTrack } from "./TimelineTrack";
+import { WeatherBadge } from "./WeatherBadge";
 
 interface DayRowProps {
   date: Date;
@@ -32,6 +34,7 @@ export function DayRow({
   onRemoveAllClick,
 }: DayRowProps) {
   const { settings } = useSettings();
+  const { weatherByDate } = useWeather();
   const iso = toISODate(date);
   const activeDayCount = workdayCount(settings.workdays);
   const totalMinutes = sumCountedMinutes(sessions, settings.entryTypeCounting);
@@ -43,7 +46,10 @@ export function DayRow({
   return (
     <div className={`day-row${isToday ? " is-today" : ""}`} style={{ "--row-index": index } as CSSProperties}>
       <div className="day-row-header">
-        <div className="weekday">{formatWeekdayShort(date)}</div>
+        <div className="day-row-header-top">
+          <div className="weekday">{formatWeekdayShort(date)}</div>
+          <WeatherBadge day={weatherByDate[iso]} weekdayLabel={formatWeekdayShort(date)} dateLabel={formatDayHeaderLabel(date)} />
+        </div>
         <div className="date">{formatDayShort(date)}</div>
       </div>
 

@@ -1,6 +1,7 @@
 import { useMemo, useRef } from "react";
 import type { WorkSession } from "../types/WorkSession";
 import { useDragToSelect } from "../hooks/useDragToSelect";
+import { useTimelineHover } from "../hooks/useTimelineHover";
 import { timeStringToMinutes } from "../utils/dateUtils";
 import { minutesToPercent } from "../utils/timelineLayout";
 import { TimelineBlock } from "./TimelineBlock";
@@ -28,6 +29,7 @@ export function TimelineTrack({
 }: TimelineTrackProps) {
   const trackRef = useRef<HTMLDivElement>(null);
   const ghostRef = useRef<HTMLDivElement>(null);
+  const hoverLineRef = useRef<HTMLDivElement>(null);
 
   const sessionIntervals = useMemo(
     () => sessions.map((s) => ({ start: timeStringToMinutes(s.start), end: timeStringToMinutes(s.end) })),
@@ -43,6 +45,12 @@ export function TimelineTrack({
     sessionIntervals
   );
 
+  const {
+    onPointerDownCapture: onHoverPointerDownCapture,
+    onPointerMove: onHoverPointerMove,
+    onPointerLeave: onHoverPointerLeave,
+  } = useTimelineHover(trackRef, hoverLineRef, rangeStartMin, rangeEndMin);
+
   // Hidden rather than clamped to the edge when "now" falls outside the
   // visible timebar range (e.g. a Timebar range setting of 8-18h, checked
   // at 20:00) -- pinning it to the edge would misleadingly suggest "now" is
@@ -50,9 +58,19 @@ export function TimelineTrack({
   const showNowLine = nowMinutes != null && nowMinutes >= rangeStartMin && nowMinutes <= rangeEndMin;
 
   return (
-    <div ref={trackRef} className="timeline-track" onPointerDown={onPointerDown}>
+    <div
+      ref={trackRef}
+      className="timeline-track"
+      onPointerDown={onPointerDown}
+      onPointerDownCapture={onHoverPointerDownCapture}
+      onPointerMove={onHoverPointerMove}
+      onPointerLeave={onHoverPointerLeave}
+    >
       {/* Ghost block shown while dragging to preview the selected range. */}
       <div ref={ghostRef} className="timeline-ghost" hidden />
+      {/* Hover preview: a thin guide line at the cursor's time, paired with
+          the floating time-label pill (see useTimelineHover). */}
+      <div ref={hoverLineRef} className="timeline-hover-line" hidden aria-hidden="true" />
       {showNowLine && (
         <div
           className="timeline-now-line"

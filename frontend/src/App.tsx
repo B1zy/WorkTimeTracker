@@ -2,12 +2,13 @@ import { useMemo, useState } from "react";
 import { createSession, deleteSession, getAllSessions, updateSession } from "./api/workSessions";
 import { backupFilename, buildBackup, downloadJson, parseBackup } from "./utils/backup";
 import { addDays, formatWeekRangeLabel, getMonday, timeRangesOverlap, timeStringToMinutes, toISODate } from "./utils/dateUtils";
-import { minsToTimeStr, snapToNearestFreeSlot } from "./utils/timelineLayout";
+import { ENTRY_TYPE_LABEL, minsToTimeStr, snapToNearestFreeSlot } from "./utils/timelineLayout";
 import { weekDates } from "./utils/workweek";
 import { computeWeekSummary, targetMarkerPercent } from "./utils/weekSummary";
 import { useWeekData } from "./hooks/useWeekData";
 import { useSessionDialog } from "./hooks/useSessionDialog";
 import { useWeekCorrections } from "./hooks/useWeekCorrections";
+import { useLiveRecording } from "./hooks/useLiveRecording";
 import { useSettings } from "./contexts/SettingsContext";
 import { WeekHeader } from "./components/WeekHeader";
 import { ErrorBanner } from "./components/ErrorBanner";
@@ -39,6 +40,7 @@ function App() {
   const { sessionsByDate, totalMinutes, error: fetchError, refetch } = useWeekData(currentMonday);
   const dialog = useSessionDialog();
   const { corrections, getCorrection, setCorrection, replaceAll: replaceCorrections } = useWeekCorrections();
+  const recording = useLiveRecording();
 
   const mondayIso = useMemo(() => toISODate(currentMonday), [currentMonday]);
   const correctionMinutes = getCorrection(mondayIso);
@@ -77,6 +79,63 @@ function App() {
 
   function handleCorrectionChange(value: number) {
     setCorrection(mondayIso, value);
+  }
+
+  // Starts on the first click; on the second, turns the [start, end) span
+  // into a plain Working session. Kept deliberately simple -- name/location
+  // match SessionDialog's own defaults for a new entry, and the user can
+  // still edit the result afterward like any other session.
+  async function handleToggleRecording() {
+    if (!recording.isRecording) {
+      recording.start();
+      return;
+    }
+
+    const result = recording.stop();
+    if (!result) return;
+    const { start, end } = result;
+
+    const startIso = toISODate(start);
+    const startMinutes = start.getHours() * 60 + start.getMinutes();
+    // A recording that crosses midnight is capped at the end of its start
+    // day rather than spilling onto a second date -- sessions here are
+    // always single-day.
+    const endMinutes = toISODate(end) === startIso ? end.getHours() * 60 + end.getMinutes() : 23 * 60 + 59;
+
+    if (endMinutes <= startMinutes) {
+      setMutationError("Recording was too short to save (less than a minute).");
+      return;
+    }
+
+    const session: NewWorkSession = {
+      name: ENTRY_TYPE_LABEL.Working,
+      description: "",
+      location: "InOffice",
+      entryType: "Working",
+      date: startIso,
+      start: minsToTimeStr(startMinutes),
+      end: minsToTimeStr(endMinutes),
+    };
+
+    if (hasOverlap(session, null)) {
+      setMutationError("Recorded time overlaps an existing session -- not saved.");
+      return;
+    }
+
+    try {
+      setMutationError(null);
+      await createSession(session);
+      const startMondayIso = toISODate(getMonday(start));
+      if (startMondayIso !== mondayIso) {
+        // Jump to the week the recording actually landed in, so the new
+        // entry is visible rather than silently added off-screen.
+        setCurrentMonday(getMonday(start));
+      } else {
+        await refetch();
+      }
+    } catch (err) {
+      setMutationError(errorMessage(err));
+    }
   }
 
   function handleAddClick(dateIso: string, dateObj: Date, startTime?: string | null, endTime?: string | null) {
@@ -260,6 +319,9 @@ function App() {
               targetPercent={targetMarkerPercent(settings.weeklyTargetMinutes)}
               correctionMinutes={correctionMinutes}
               onCorrectionChange={handleCorrectionChange}
+              isRecording={recording.isRecording}
+              recordingElapsedMinutes={recording.elapsedMinutes}
+              onToggleRecording={handleToggleRecording}
             />
 
             <ErrorBanner message={error} />

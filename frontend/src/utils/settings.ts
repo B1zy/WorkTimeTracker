@@ -30,6 +30,17 @@ export interface AppSettings {
   entryTypeCounting: EntryTypeCounting;
   // Which weekdays are shown on the week view and counted toward totals.
   workdays: Weekday[];
+  // Card entrances, popovers, hover/press transitions, etc. Independent of
+  // (and additive with) the OS-level prefers-reduced-motion media query --
+  // either one turns animations off, since a user might want them off here
+  // without changing a system-wide accessibility setting.
+  animationsEnabled: boolean;
+  // Drag-to-reorder position of the cards in the main Settings panel, as a
+  // list of section ids. Deliberately loose here -- may be empty, short, or
+  // contain ids from a since-removed section; SettingsPanel reconciles it
+  // against the current canonical section list on every render, so this is
+  // just "whatever was saved," not a guaranteed-valid permutation.
+  settingsSectionOrder: string[];
 }
 
 export const DEFAULT_COLORS: SettingsColors = {
@@ -53,6 +64,8 @@ export const DEFAULT_SETTINGS: AppSettings = {
   timelineEndMin: DEFAULT_TIMELINE_END_MIN,
   entryTypeCounting: DEFAULT_ENTRY_TYPE_COUNTING,
   workdays: DEFAULT_WORKDAYS,
+  animationsEnabled: true,
+  settingsSectionOrder: [],
 };
 
 const STORAGE_KEY = "worktimetracker.settings.v1";
@@ -97,6 +110,10 @@ export function loadSettings(): AppSettings {
       timelineEndMin: parsed.timelineEndMin ?? DEFAULT_TIMELINE_END_MIN,
       entryTypeCounting: sanitizeCounting(parsed.entryTypeCounting),
       workdays: sanitizeWorkdays(parsed.workdays),
+      animationsEnabled: parsed.animationsEnabled ?? true,
+      settingsSectionOrder: Array.isArray(parsed.settingsSectionOrder)
+        ? parsed.settingsSectionOrder.filter((id): id is string => typeof id === "string")
+        : [],
     };
   } catch {
     return DEFAULT_SETTINGS;
@@ -112,4 +129,12 @@ export function applyColorOverrides(colors: SettingsColors): void {
   for (const key of Object.keys(COLOR_CSS_VAR) as (keyof SettingsColors)[]) {
     root.style.setProperty(COLOR_CSS_VAR[key], colors[key]);
   }
+}
+
+// Toggles the blanket animation/transition kill-switch (see index.css's
+// .no-animations rule) that backs this setting -- a plain class rather than
+// a CSS var since it needs to override every animated selector at once, not
+// just feed a value into ones that opted in.
+export function applyMotionPreference(animationsEnabled: boolean): void {
+  document.documentElement.classList.toggle("no-animations", !animationsEnabled);
 }

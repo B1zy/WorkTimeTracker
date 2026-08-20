@@ -18,6 +18,9 @@ interface WeekHeaderProps {
   targetPercent: number;
   correctionMinutes: number;
   onCorrectionChange: (value: number) => void;
+  isRecording: boolean;
+  recordingElapsedMinutes: number;
+  onToggleRecording: () => void;
 }
 
 export function WeekHeader({
@@ -33,6 +36,9 @@ export function WeekHeader({
   targetPercent,
   correctionMinutes,
   onCorrectionChange,
+  isRecording,
+  recordingElapsedMinutes,
+  onToggleRecording,
 }: WeekHeaderProps) {
   const { settings } = useSettings();
 
@@ -52,11 +58,18 @@ export function WeekHeader({
           <span className="summary-target">/ {formatDuration(settings.weeklyTargetMinutes)} target</span>
         </div>
 
-        {/* Console-lamp status indicator: a glowing dot + colored label. */}
-        <span className={`status-indicator status-${state}`}>
+        {/* Console-lamp status indicator, doubling as the clock-in/out
+            control: click to start recording the current time, click again
+            to stop and save the elapsed span as a Working session. */}
+        <button
+          type="button"
+          className={`status-indicator status-${isRecording ? "recording" : state}`}
+          onClick={onToggleRecording}
+          title={isRecording ? "Stop recording and save as a work session" : "Start recording the current time"}
+        >
           <span className="status-lamp" />
-          <span className="status-label">{label}</span>
-        </span>
+          <span className="status-label">{isRecording ? `Recording · ${formatDuration(recordingElapsedMinutes)}` : label}</span>
+        </button>
 
         <div className="summary-meter">
           <SummaryGauge state={state} fillPercent={fillPercent} targetPercent={targetPercent} />

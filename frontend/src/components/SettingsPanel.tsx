@@ -1,5 +1,6 @@
-import { useRef, useState, type ChangeEvent } from "react";
+import { useMemo, useRef, useState, type ChangeEvent, type ReactNode } from "react";
 import { useSettings } from "../contexts/SettingsContext";
+import { useWeather } from "../contexts/WeatherContext";
 import {
   COUNTING_MODES,
   COUNTING_MODE_LABEL,
@@ -8,6 +9,8 @@ import {
 import { WEEKDAY_DISPLAY_ORDER, WEEKDAY_LABEL, type Weekday } from "../utils/workweek";
 import { ENTRY_TYPE_LABEL } from "../utils/timelineLayout";
 import { TimeField } from "./TimeField";
+import { SortableSection } from "./SortableSection";
+import { useSectionReorder } from "../hooks/useSectionReorder";
 import type { EntryType } from "../types/WorkSession";
 
 const ENTRY_TYPES: EntryType[] = ["Working", "Sick", "OvertimeCompensation", "Appointment", "Lunch"];
@@ -20,6 +23,24 @@ const SETTINGS_ENTRY_TYPE_LABEL: Partial<Record<EntryType, string>> = {
 };
 
 const DAY_MINUTES = 24 * 60;
+
+// Canonical set of cards in the main Settings panel, in their default order.
+// This is the single source of truth for "what sections exist" -- a saved
+// settingsSectionOrder is reconciled against it below, so removing/renaming
+// a section here can't leave a stored layout pointing at nothing.
+const SETTINGS_SECTION_IDS = ["weekly-target", "what-counts", "animations", "timebar-range", "weather", "data-backup"] as const;
+
+// A saved order may be empty (nothing customized yet), missing ids (a
+// section was added since), or carrying stale ones (a section was removed) --
+// this always returns a valid permutation of the current section set:
+// whatever from the saved order still exists, in that order, then any
+// sections not yet placed appended at the end.
+function resolveSectionOrder(stored: string[]): string[] {
+  const known = new Set<string>(SETTINGS_SECTION_IDS);
+  const placed = stored.filter((id) => known.has(id));
+  const missing = SETTINGS_SECTION_IDS.filter((id) => !placed.includes(id));
+  return [...placed, ...missing];
+}
 
 interface SettingsPanelProps {
   onClearAllData: () => Promise<void>;
@@ -36,10 +57,39 @@ interface SettingsPanelProps {
 export function SettingsPanel({ onClearAllData, onExportData, onImportData }: SettingsPanelProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { settings, updateSettings } = useSettings();
+  const { location, loading: weatherLoading, error: weatherError, permissionDenied, requestLocation, clearLocation } = useWeather();
   const [confirmingClear, setConfirmingClear] = useState(false);
   const [clearing, setClearing] = useState(false);
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
+  const [isEditingLayout, setIsEditingLayout] = useState(false);
+  // Snapshot of the order when editing began, so Cancel can put it back --
+  // reordering itself commits to settings live (see onReorder below), not
+  // just on Done, which is what makes a separate revert necessary.
+  const editSnapshotRef = useRef<string[] | null>(null);
+
+  const order = useMemo(() => resolveSectionOrder(settings.settingsSectionOrder), [settings.settingsSectionOrder]);
+  const { draggingId, dragRect, registerItemRef, getSurfaceProps } = useSectionReorder({
+    order,
+    onReorder: (next) => updateSettings((prev) => ({ ...prev, settingsSectionOrder: next })),
+  });
+
+  function handleStartEditingLayout() {
+    editSnapshotRef.current = order;
+    setIsEditingLayout(true);
+  }
+
+  function handleDoneEditingLayout() {
+    setIsEditingLayout(false);
+  }
+
+  function handleCancelEditingLayout() {
+    if (editSnapshotRef.current) {
+      const snapshot = editSnapshotRef.current;
+      updateSettings((prev) => ({ ...prev, settingsSectionOrder: snapshot }));
+    }
+    setIsEditingLayout(false);
+  }
 
   function handleTargetHoursChange(event: ChangeEvent<HTMLInputElement>) {
     const hours = Number(event.target.value);
@@ -53,6 +103,10 @@ export function SettingsPanel({ onClearAllData, onExportData, onImportData }: Se
 
   function handleTimelineEndChange(mins: number) {
     updateSettings((prev) => ({ ...prev, timelineEndMin: Math.max(mins, prev.timelineStartMin + 60) }));
+  }
+
+  function handleToggleAnimations() {
+    updateSettings((prev) => ({ ...prev, animationsEnabled: !prev.animationsEnabled }));
   }
 
   async function handleExport() {
@@ -118,12 +172,9 @@ export function SettingsPanel({ onClearAllData, onExportData, onImportData }: Se
     }
   }
 
-  return (
-    <section className="settings-inline">
-      <h2 id="settings-title">Settings</h2>
-
-      <div className="settings-grid">
-      <section className="settings-section">
+  const sectionContent: Record<string, ReactNode> = {
+    "weekly-target": (
+      <>
         <h3 className="settings-section-title">Weekly target</h3>
         <div className="form-row">
           <label htmlFor="weekly-target-input">Target</label>
@@ -161,9 +212,11 @@ export function SettingsPanel({ onClearAllData, onExportData, onImportData }: Se
             })}
           </div>
         </div>
-      </section>
+      </>
+    ),
 
-      <section className="settings-section">
+    "what-counts": (
+      <>
         <h3 className="settings-section-title">What counts as worked time</h3>
         <div className="settings-counting-grid">
           {ENTRY_TYPES.map((type) => (
@@ -187,14 +240,29 @@ export function SettingsPanel({ onClearAllData, onExportData, onImportData }: Se
             </div>
           ))}
         </div>
-      </section>
+      </>
+    ),
 
-      {/* Timebar range + Data & backup stacked in one grid column, rather
-          than each taking its own -- together they're still shorter than
-          the "What counts" card, which stacking two separate narrow columns
-          side by side wasn't guaranteed to be. */}
-      <div className="settings-stack">
-      <section className="settings-section">
+    animations: (
+      <>
+        <h3 className="settings-section-title">Animations</h3>
+        <div className="form-row">
+          <label htmlFor="animations-toggle">Card entrances, popovers, transitions</label>
+          <button
+            id="animations-toggle"
+            type="button"
+            className={`settings-toggle-btn${settings.animationsEnabled ? " is-on" : ""}`}
+            aria-pressed={settings.animationsEnabled}
+            onClick={handleToggleAnimations}
+          >
+            {settings.animationsEnabled ? "On" : "Off"}
+          </button>
+        </div>
+      </>
+    ),
+
+    "timebar-range": (
+      <>
         <h3 className="settings-section-title">Timebar range</h3>
         <div className="settings-time-range-row">
           <TimeField
@@ -229,9 +297,43 @@ export function SettingsPanel({ onClearAllData, onExportData, onImportData }: Se
             <span>24:00</span>
           </div>
         </div>
-      </section>
+      </>
+    ),
 
-      <section className="settings-section">
+    weather: (
+      <>
+        <h3 className="settings-section-title">Weather</h3>
+        <p className="settings-hint">
+          Shows a small forecast icon next to each day. Uses your browser's location -- nothing is sent anywhere but
+          the (keyless, public) Open-Meteo API.
+        </p>
+        <div className="settings-weather-row">
+          {location ? (
+            <>
+              <span className="settings-weather-status">
+                Location set ({location.lat.toFixed(2)}, {location.lon.toFixed(2)})
+              </span>
+              <button type="button" className="btn-secondary" onClick={clearLocation}>
+                Turn off
+              </button>
+            </>
+          ) : (
+            <button type="button" className="btn-secondary" onClick={requestLocation} disabled={weatherLoading}>
+              {weatherLoading ? "Requesting…" : "Use my location"}
+            </button>
+          )}
+        </div>
+        {weatherError && (
+          <p className="settings-hint settings-weather-error">
+            {weatherError}
+            {permissionDenied && " You can re-enable location access for this site in your browser's settings."}
+          </p>
+        )}
+      </>
+    ),
+
+    "data-backup": (
+      <>
         <h3 className="settings-section-title">Data &amp; backup</h3>
         <div className="settings-backup-actions">
           <button type="button" className="btn-secondary" onClick={handleExport} disabled={busy}>
@@ -268,8 +370,45 @@ export function SettingsPanel({ onClearAllData, onExportData, onImportData }: Se
             Cancel
           </button>
         )}
-      </section>
+      </>
+    ),
+  };
+
+  return (
+    <section className="settings-inline">
+      <div className="settings-section-heading-row">
+        <h2 id="settings-title">Settings</h2>
+        <div className="settings-edit-layout-actions">
+          {isEditingLayout && (
+            <button type="button" className="settings-reset-btn" onClick={handleCancelEditingLayout}>
+              Cancel
+            </button>
+          )}
+          <button
+            type="button"
+            className={`settings-reset-btn${isEditingLayout ? " is-active" : ""}`}
+            aria-pressed={isEditingLayout}
+            onClick={isEditingLayout ? handleDoneEditingLayout : handleStartEditingLayout}
+          >
+            {isEditingLayout ? "Done" : "Edit Layout"}
+          </button>
+        </div>
       </div>
+
+      <div className={`settings-grid${isEditingLayout ? " is-editing" : ""}`}>
+        {order.map((id) => (
+          <SortableSection
+            key={id}
+            id={id}
+            isEditing={isEditingLayout}
+            isDragging={draggingId === id}
+            dragRect={draggingId === id ? dragRect : null}
+            registerItemRef={registerItemRef}
+            onSurfacePointerDown={getSurfaceProps(id).onPointerDown}
+          >
+            {sectionContent[id]}
+          </SortableSection>
+        ))}
       </div>
     </section>
   );
