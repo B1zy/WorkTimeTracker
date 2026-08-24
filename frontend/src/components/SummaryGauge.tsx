@@ -26,6 +26,13 @@ interface SummaryGaugeProps {
 //     instead the needle's *required* extra hours are shown as a debt
 //     segment stretching out past the fixed 42h mark; it clears once the
 //     fill actually reaches that extended point.
+//
+// Both segments (and the label) are *always* mounted, collapsed to width 0
+// / opacity 0 when not applicable, rather than conditionally rendered --
+// mounting fresh with `left`/`width` already at their final value skips the
+// CSS transition entirely (nothing to transition *from*), which is exactly
+// why the segment used to just pop into place instead of sliding in attached
+// to the fill's leading edge.
 export function SummaryGauge({
   state,
   fillPercent,
@@ -39,38 +46,40 @@ export function SummaryGauge({
 
   const creditEnd = Math.min(fillPercent + carryoverPercent, nominalTargetPercent);
   const showCredit = isSurplus && fillPercent < nominalTargetPercent;
+  const creditWidth = showCredit ? creditEnd - fillPercent : 0;
 
   const debtEnd = Math.min(nominalTargetPercent + carryoverPercent, 100);
   const showDebt = isDeficit && fillPercent < debtEnd;
+  const debtWidth = showDebt ? debtEnd - nominalTargetPercent : 0;
+
+  const labelVisible = showCredit || showDebt;
+  const labelLeft = isSurplus ? fillPercent + creditWidth / 2 : nominalTargetPercent + debtWidth / 2;
 
   return (
     <div className="summary-bar-wrapper" title={tooltip}>
       <div className="summary-bar-track">
         <div className={`summary-bar-fill state-${state}`} style={{ width: `${fillPercent}%` }} />
-        {showCredit && (
-          <div
-            className="summary-bar-carryover-segment is-surplus"
-            style={{ left: `${fillPercent}%`, width: `${creditEnd - fillPercent}%` }}
-          />
-        )}
-        {showDebt && (
-          <div
-            className="summary-bar-carryover-segment is-deficit"
-            style={{ left: `${nominalTargetPercent}%`, width: `${debtEnd - nominalTargetPercent}%` }}
-          />
-        )}
+        {/* left always tracks fillPercent, even at width 0, so the moment it
+            does need to show it's already riding the fill's leading edge
+            instead of jumping there. */}
+        <div
+          className="summary-bar-carryover-segment is-surplus"
+          style={{ left: `${fillPercent}%`, width: `${creditWidth}%` }}
+        />
+        <div
+          className="summary-bar-carryover-segment is-deficit"
+          style={{ left: `${nominalTargetPercent}%`, width: `${debtWidth}%` }}
+        />
       </div>
       {/* Sibling of .summary-bar-track (not nested) so the needle can extend
           above the track without being clipped by the track's overflow:hidden. */}
       <div className="summary-bar-target-marker" style={{ left: `${nominalTargetPercent}%` }} />
-      {(showCredit || showDebt) && (
-        <div
-          className={`summary-bar-carryover-label ${isSurplus ? "is-surplus" : "is-deficit"}`}
-          style={{ left: `${showCredit ? (fillPercent + creditEnd) / 2 : (nominalTargetPercent + debtEnd) / 2}%` }}
-        >
-          {formatSignedDuration(carryoverMinutes)}
-        </div>
-      )}
+      <div
+        className={`summary-bar-carryover-label ${isSurplus ? "is-surplus" : "is-deficit"}`}
+        style={{ left: `${labelLeft}%`, opacity: labelVisible ? 1 : 0 }}
+      >
+        {formatSignedDuration(carryoverMinutes)}
+      </div>
     </div>
   );
 }

@@ -7,7 +7,6 @@ import { sumCountedMinutes } from "../utils/entryTypeCounting";
 import { workdayCount } from "../utils/workweek";
 import { classifySummaryState, dayTargetLabel, dayTargetMinutes } from "../utils/weekSummary";
 import { computeDayBreakCompliance } from "../utils/breakCompliance";
-import { CopyIcon, PasteIcon } from "./DayActionIcons";
 import { TimelineAxis } from "./TimelineAxis";
 import { TimelineTrack } from "./TimelineTrack";
 import { WeatherBadge } from "./WeatherBadge";
@@ -121,21 +120,19 @@ export function DayRow({
             type="button"
             className="copy-btn"
             title="Copy this day's entries"
-            aria-label="Copy this day's entries"
             onClick={() => onCopyClick(iso)}
           >
-            <CopyIcon />
+            Copy
           </button>
           <button
             type="button"
             className={`paste-btn${isConfirmingPaste ? " is-confirming" : ""}`}
             title={pasteLabel}
-            aria-label={pasteLabel}
             disabled={!hasClipboard}
             onClick={handlePasteButtonClick}
             onBlur={() => setConfirmingPaste(false)}
           >
-            <PasteIcon />
+            {isConfirmingPaste ? "Sure?" : "Paste"}
           </button>
         </div>
       </div>

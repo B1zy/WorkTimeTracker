@@ -427,6 +427,10 @@ body {
   bottom: 0;
   background-repeat: repeat;
   background-size: 8px 8px;
+  /* Same timing as .summary-bar-fill so the credit/debt segment tracks the
+     fill's own left-to-right growth smoothly instead of snapping to its new
+     position/size a beat later. */
+  transition: left 0.3s ease, width 0.3s ease;
 }
 .summary-bar-carryover-segment.is-surplus {
   background-image: repeating-linear-gradient(
@@ -465,6 +469,10 @@ body {
   font-weight: 700;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
+  pointer-events: none;
+  /* Always mounted (see SummaryGauge) so appearing/disappearing fades and
+     slides instead of popping in already positioned. */
+  transition: left 0.3s ease, opacity 0.3s ease;
 }
 .summary-bar-carryover-label::after {
   content: "";
@@ -1124,17 +1132,16 @@ body {
 }
 
 /* Second row of day-row-actions: copy this day's entries, or replace the
-   day with whatever's currently copied. Icon-only (unlike Add/Clear) -- the
-   glyphs are self-explanatory enough that spelling them out would just cost
-   width, so the accessible name lives in aria-label/title instead. */
+   day with whatever's currently copied. Same visual weight as Clear (a
+   secondary action next to the accent-colored Add), not the primary one. */
 .copy-btn,
 .paste-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 28px;
-  height: 26px;
-  padding: 0;
+  padding: 5px 10px;
+  font-family: var(--font-display);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
   border-radius: var(--radius);
   border: 1px solid var(--border-strong);
   background: transparent;
@@ -2089,6 +2096,7 @@ select:focus {
   bottom: 0;
   min-width: 2px;
   background: var(--accent);
+  transition: left 0.25s ease, width 0.25s ease;
 }
 .settings-time-range-ticks {
   display: flex;
@@ -2584,8 +2592,24 @@ select:focus {
   animation: cell-in 0.3s ease-out backwards;
   animation-delay: min(calc(var(--week-index, 0) * 4ms), 260ms);
 }
+
+/* Session blocks grow out from their start time instead of popping in --
+   scaleX (not width, which we don't know a hardcoded end value for -- every
+   block's is different) from its left edge, so it reads as sweeping out
+   toward its end time like the rest of the app's left-to-right bar fills. */
+@keyframes block-in {
+  from {
+    opacity: 0;
+    transform: scaleX(0);
+  }
+  to {
+    opacity: 1;
+    transform: scaleX(1);
+  }
+}
 .timeline-block {
-  animation: cell-in 0.3s ease-out backwards;
+  transform-origin: left center;
+  animation: block-in 0.3s ease-out backwards;
 }
 
 /* Tactile press feedback, consistent across every clickable control. */
