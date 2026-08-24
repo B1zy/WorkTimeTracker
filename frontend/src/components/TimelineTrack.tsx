@@ -2,8 +2,9 @@ import { useMemo, useRef } from "react";
 import type { WorkSession } from "../types/WorkSession";
 import { useDragToSelect } from "../hooks/useDragToSelect";
 import { useTimelineHover } from "../hooks/useTimelineHover";
-import { timeStringToMinutes } from "../utils/dateUtils";
+import { formatDuration, timeStringToMinutes } from "../utils/dateUtils";
 import { minutesToPercent } from "../utils/timelineLayout";
+import type { BreakCompliance } from "../utils/breakCompliance";
 import { TimelineBlock } from "./TimelineBlock";
 
 interface TimelineTrackProps {
@@ -13,6 +14,7 @@ interface TimelineTrackProps {
   // Minutes-since-midnight for today's live position, or null for any day
   // that isn't today -- only today's row ever draws the line.
   nowMinutes?: number | null;
+  breakCompliance: BreakCompliance;
   onSessionClick: (session: WorkSession) => void;
   onTrackClick: (startTime: string, endTime: string | null) => void;
   onSessionMove: (session: WorkSession, newStart: string, newEnd: string) => Promise<boolean>;
@@ -23,6 +25,7 @@ export function TimelineTrack({
   rangeStartMin,
   rangeEndMin,
   nowMinutes,
+  breakCompliance,
   onSessionClick,
   onTrackClick,
   onSessionMove,
@@ -57,6 +60,16 @@ export function TimelineTrack({
   // right at that boundary.
   const showNowLine = nowMinutes != null && nowMinutes >= rangeStartMin && nowMinutes <= rangeEndMin;
 
+  // The break tag anchors to the day's last Working block (compliance is
+  // only ever false when at least one exists) rather than floating in
+  // whatever empty track space happens to be free.
+  const lastWorkingEndMin = sessions
+    .filter((s) => s.entryType === "Working")
+    .reduce((latest, s) => Math.max(latest, timeStringToMinutes(s.end)), -Infinity);
+  const breakDeficitMinutes = breakCompliance.requiredMinutes - breakCompliance.breakMinutes;
+  const showBreakTag = !breakCompliance.isCompliant && lastWorkingEndMin > -Infinity;
+  const lastWorkingEndPercent = showBreakTag ? minutesToPercent(lastWorkingEndMin, rangeStartMin, rangeEndMin) : 0;
+
   return (
     <div
       ref={trackRef}
@@ -90,6 +103,19 @@ export function TimelineTrack({
           onSessionMove={onSessionMove}
         />
       ))}
+      {showBreakTag && (
+        <div
+          className="timeline-break-tag"
+          style={{ left: `${lastWorkingEndPercent}%` }}
+          title={`Swiss labour law (Art. 15 ArG): ${formatDuration(
+            breakCompliance.workedMinutes
+          )} worked requires at least ${formatDuration(breakCompliance.requiredMinutes)} break -- only ${formatDuration(
+            breakCompliance.breakMinutes
+          )} taken.`}
+        >
+          Needs {formatDuration(breakDeficitMinutes)} break
+        </div>
+      )}
     </div>
   );
 }

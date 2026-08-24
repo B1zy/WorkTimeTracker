@@ -1,17 +1,20 @@
 import { useMemo, useState } from "react";
 import { createSession, deleteSession, getAllSessions, updateSession } from "./api/workSessions";
 import { backupFilename, buildBackup, downloadJson, parseBackup } from "./utils/backup";
-import { addDays, formatWeekRangeLabel, getMonday, timeRangesOverlap, timeStringToMinutes, toISODate } from "./utils/dateUtils";
+import { addDays, formatDayHeaderLabel, formatWeekRangeLabel, getMonday, timeRangesOverlap, timeStringToMinutes, toISODate } from "./utils/dateUtils";
 import { ENTRY_TYPE_LABEL, minsToTimeStr, snapToNearestFreeSlot } from "./utils/timelineLayout";
 import { weekDates } from "./utils/workweek";
-import { computeWeekSummary, targetMarkerPercent } from "./utils/weekSummary";
+import { computeWeekSummary } from "./utils/weekSummary";
 import { useWeekData } from "./hooks/useWeekData";
+import { useCarryoverMinutes } from "./hooks/useCarryover";
 import { useSessionDialog } from "./hooks/useSessionDialog";
 import { useWeekCorrections } from "./hooks/useWeekCorrections";
 import { useLiveRecording } from "./hooks/useLiveRecording";
+import { useToast } from "./hooks/useToast";
 import { useSettings } from "./contexts/SettingsContext";
 import { WeekHeader } from "./components/WeekHeader";
 import { ErrorBanner } from "./components/ErrorBanner";
+import { Toast } from "./components/Toast";
 import { WeekRows } from "./components/WeekRows";
 import { SessionDialog } from "./components/SessionDialog";
 import { TopNav, type AppView } from "./components/TopNav";
@@ -35,12 +38,18 @@ function App() {
   const [currentMonday, setCurrentMonday] = useState(() => getMonday(new Date()));
   const [mutationError, setMutationError] = useState<string | null>(null);
   const [view, setView] = useState<AppView>("week");
+  // Snapshot of a day's sessions, held until pasted elsewhere. Lives here
+  // (not per-day state) so it survives navigating to a different week before
+  // pasting -- copy on one week, paste on another.
+  const [dayClipboard, setDayClipboard] = useState<WorkSession[] | null>(null);
 
   const { settings, updateSettings } = useSettings();
   const { sessionsByDate, totalMinutes, error: fetchError, refetch } = useWeekData(currentMonday);
+  const { carryoverMinutes, refetch: refetchCarryover } = useCarryoverMinutes(currentMonday);
   const dialog = useSessionDialog();
   const { corrections, getCorrection, setCorrection, replaceAll: replaceCorrections } = useWeekCorrections();
   const recording = useLiveRecording();
+  const { message: toastMessage, showToast } = useToast();
 
   const mondayIso = useMemo(() => toISODate(currentMonday), [currentMonday]);
   const correctionMinutes = getCorrection(mondayIso);
@@ -50,8 +59,8 @@ function App() {
     [weekDays]
   );
   const summary = useMemo(
-    () => computeWeekSummary(totalMinutes, correctionMinutes, settings.weeklyTargetMinutes),
-    [totalMinutes, correctionMinutes, settings.weeklyTargetMinutes]
+    () => computeWeekSummary(totalMinutes, correctionMinutes, carryoverMinutes, settings.weeklyTargetMinutes),
+    [totalMinutes, correctionMinutes, carryoverMinutes, settings.weeklyTargetMinutes]
   );
 
   const error = mutationError ?? fetchError;
@@ -246,12 +255,47 @@ function App() {
     }
   }
 
+  function handleCopyDay(dateIso: string) {
+    setDayClipboard(sessionsByDate[dateIso] ?? []);
+    const dateObj = new Date(`${dateIso}T00:00:00`);
+    showToast(`Copied ${formatDayHeaderLabel(dateObj)}`);
+  }
+
+  // Replaces the target day's entries outright: existing sessions are
+  // deleted first, then the copied ones are recreated on the new date with
+  // their original times/type/name intact. Sequential creates for the same
+  // SQLite-writer reason as deleteSessionsSequentially.
+  async function handlePasteDay(dateIso: string) {
+    if (!dayClipboard) return;
+
+    try {
+      setMutationError(null);
+      const existing = sessionsByDate[dateIso] ?? [];
+      await deleteSessionsSequentially(existing.map((s) => s.id));
+
+      for (const session of dayClipboard) {
+        await createSession({
+          name: session.name,
+          description: session.description,
+          location: session.location,
+          entryType: session.entryType,
+          date: dateIso,
+          start: session.start,
+          end: session.end,
+        });
+      }
+      await refetch();
+    } catch (err) {
+      setMutationError(errorMessage(err));
+    }
+  }
+
   async function handleClearAllData() {
     try {
       setMutationError(null);
       const all = await getAllSessions();
       await deleteSessionsSequentially(all.map((s) => s.id));
-      await refetch();
+      await Promise.all([refetch(), refetchCarryover()]);
     } catch (err) {
       setMutationError(errorMessage(err));
     }
@@ -293,7 +337,7 @@ function App() {
 
     if (backup.settings) updateSettings(() => backup.settings);
     if (backup.corrections) replaceCorrections(backup.corrections);
-    await refetch();
+    await Promise.all([refetch(), refetchCarryover()]);
 
     if (failed > 0) setMutationError(`${failed} of ${backup.sessions.length} entries could not be restored.`);
     return { imported, failed };
@@ -313,10 +357,10 @@ function App() {
               onNextWeek={handleNextWeek}
               onSelectWeek={handleSelectWeek}
               adjustedMinutes={summary.adjustedMinutes}
+              requiredMinutes={summary.requiredMinutes}
               state={summary.state}
               label={summary.label}
               fillPercent={summary.fillPercent}
-              targetPercent={targetMarkerPercent(settings.weeklyTargetMinutes)}
               correctionMinutes={correctionMinutes}
               onCorrectionChange={handleCorrectionChange}
               isRecording={recording.isRecording}
@@ -333,6 +377,9 @@ function App() {
               onSessionClick={handleSessionClick}
               onSessionMove={handleSessionMove}
               onRemoveAllClick={handleRemoveAllClick}
+              onCopyClick={handleCopyDay}
+              onPasteClick={handlePasteDay}
+              hasClipboard={dayClipboard !== null}
             />
           </>
         ) : (
@@ -344,6 +391,7 @@ function App() {
         )}
       </div>
 
+      <Toast message={toastMessage} />
       <SessionDialog state={dialog.state} onClose={dialog.close} />
     </>
   );

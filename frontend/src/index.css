@@ -280,31 +280,6 @@ body {
   min-width: 300px;
 }
 
-.summary-hours {
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
-  flex-shrink: 0;
-}
-
-.summary-total {
-  font-family: var(--font-mono);
-  font-size: 2.1rem;
-  font-weight: 700;
-  font-variant-numeric: tabular-nums;
-  line-height: 1;
-  text-shadow: 0 0 10px rgba(255, 90, 31, 0.25);
-}
-
-.summary-target {
-  font-family: var(--font-display);
-  font-size: 0.8rem;
-  font-weight: 700;
-  color: var(--text-secondary);
-  letter-spacing: 0.02em;
-  white-space: nowrap;
-}
-
 /* Console-lamp status indicator: a solid dot + a filled, dark-on-color
    label pill -- like a lamp on a control panel. Previously a glowing/pulsing
    colored text on transparent; that read as neon rather than as a real
@@ -393,7 +368,7 @@ body {
 
 .summary-bar-track {
   position: relative;
-  height: 14px;
+  height: 22px;
   background-color: var(--surface-raised);
   border: 1px solid var(--border);
   border-radius: var(--radius);
@@ -439,6 +414,67 @@ body {
   border-right: 5px solid transparent;
   border-top: 6px solid var(--text-primary);
 }
+
+/* Carryover segment -- surplus picks up right where the real fill ends and
+   reaches toward the needle (capped there, shrinking as the real fill closes
+   the gap on its own); deficit stretches out past the fixed 42h mark to show
+   the extra hours it now takes to actually reach the needle. Either way it's
+   attached to the bar it's modifying, not a number floating off to the side.
+   Inside .summary-bar-track so it clips to the track like the fill does. */
+.summary-bar-carryover-segment {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background-repeat: repeat;
+  background-size: 8px 8px;
+}
+.summary-bar-carryover-segment.is-surplus {
+  background-image: repeating-linear-gradient(
+    45deg,
+    color-mix(in srgb, var(--state-target) 45%, transparent) 0,
+    color-mix(in srgb, var(--state-target) 45%, transparent) 1px,
+    transparent 1px,
+    transparent 50%
+  );
+}
+.summary-bar-carryover-segment.is-deficit {
+  background-image: repeating-linear-gradient(
+    45deg,
+    color-mix(in srgb, var(--state-over) 45%, transparent) 0,
+    color-mix(in srgb, var(--state-over) 45%, transparent) 1px,
+    transparent 1px,
+    transparent 50%
+  );
+}
+
+/* Sibling of .summary-bar-track so it isn't clipped -- sits directly above
+   the segment it labels, centered over its midpoint, with a tick (::after)
+   dropping from the text down to the track's top edge so the label reads as
+   attached to the segment boundary rather than floating independently of it. */
+.summary-bar-carryover-label {
+  position: absolute;
+  bottom: 100%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding-bottom: 2px;
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.summary-bar-carryover-label::after {
+  content: "";
+  width: 1px;
+  height: 6px;
+  background: currentColor;
+  opacity: 0.7;
+}
+.summary-bar-carryover-label.is-surplus { color: var(--state-target); }
+.summary-bar-carryover-label.is-deficit { color: var(--state-over); }
 
 /* --- Day rows --- */
 
@@ -1018,6 +1054,33 @@ body {
 .day-total.state-target { color: var(--state-target); text-shadow: none; }
 .day-total.state-over { color: var(--state-over); text-shadow: none; }
 
+/* Only rendered when a day's Working hours cross an Art. 15 ArG break
+   threshold without enough logged break time -- a quiet flag, not a status
+   shown on every compliant day. A plain text tag pinned to the right edge of
+   the day's last Working block (inside .timeline-track, which has no
+   overflow:hidden to clip against) so it reads as attached to that bar
+   rather than floating in whatever empty track space happens to be free. */
+.timeline-break-tag {
+  position: absolute;
+  top: 5px;
+  transform: translateX(-100%);
+  margin-left: -4px;
+  z-index: 3;
+  font-family: var(--font-display);
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  padding: 3px 7px;
+  border-radius: var(--radius);
+  border: 1px solid var(--state-over);
+  background: var(--surface-raised);
+  color: var(--state-over);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.5);
+  cursor: default;
+}
+
 .day-row-actions {
   display: flex;
   gap: 6px;
@@ -1058,6 +1121,46 @@ body {
   background: var(--state-over);
   border-color: var(--state-over);
   color: var(--text-on-accent);
+}
+
+/* Second row of day-row-actions: copy this day's entries, or replace the
+   day with whatever's currently copied. Icon-only (unlike Add/Clear) -- the
+   glyphs are self-explanatory enough that spelling them out would just cost
+   width, so the accessible name lives in aria-label/title instead. */
+.copy-btn,
+.paste-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 26px;
+  padding: 0;
+  border-radius: var(--radius);
+  border: 1px solid var(--border-strong);
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+.copy-btn:hover,
+.paste-btn:not(:disabled):hover {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--text-on-accent);
+}
+.paste-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+/* Second click required to actually overwrite -- same solid-fill "about to
+   do something destructive" signal as .settings-clear-btn.is-confirming. */
+.paste-btn.is-confirming {
+  background: var(--state-over);
+  border-color: var(--state-over);
+  color: var(--text-on-accent);
+}
+.paste-btn.is-confirming:hover {
+  background: var(--state-over);
+  border-color: var(--state-over);
 }
 
 /* Phone-width layout: .day-row's 112px/1fr/138px column grid was the one
@@ -2370,6 +2473,41 @@ select:focus {
   color: var(--text-on-accent);
 }
 
+/* --- Toast --- */
+
+/* Transient confirmation (e.g. "Copied Monday, Aug 24") -- fixed to the
+   viewport and non-interactive so it can't block anything underneath, and
+   self-dismisses (see useToast) rather than needing to be closed. */
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: 28px;
+  transform: translateX(-50%);
+  z-index: 50;
+  padding: 10px 18px;
+  border-radius: var(--radius);
+  border: 1px solid var(--accent);
+  background: var(--surface-raised);
+  color: var(--text-primary);
+  font-family: var(--font-display);
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
+  pointer-events: none;
+  animation: toast-in 0.2s ease;
+}
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+}
+
 /* --- Errors --- */
 
 .error {
@@ -2455,6 +2593,8 @@ select:focus {
 .top-nav-tab,
 .add-btn,
 .remove-all-btn,
+.copy-btn,
+.paste-btn,
 .correction-btn,
 .correction-popover-btn,
 .week-range-btn,
@@ -2470,6 +2610,8 @@ select:focus {
 .top-nav-tab:active,
 .add-btn:active,
 .remove-all-btn:active,
+.copy-btn:active,
+.paste-btn:not(:disabled):active,
 .correction-btn:active,
 .correction-popover-btn:active,
 .week-range-btn:active,
@@ -2487,7 +2629,8 @@ select:focus {
   .week-header,
   .overview,
   .settings-inline,
-  .overview-grid .overview-cell {
+  .overview-grid .overview-cell,
+  .toast {
     animation: none;
   }
   .status-indicator.status-recording .status-lamp {
@@ -2497,6 +2640,8 @@ select:focus {
   .top-nav-tab,
   .add-btn,
   .remove-all-btn,
+  .copy-btn,
+  .paste-btn,
   .correction-btn,
   .correction-popover-btn,
   .week-range-btn,
@@ -2511,6 +2656,8 @@ select:focus {
   .top-nav-tab:active,
   .add-btn:active,
   .remove-all-btn:active,
+  .copy-btn:active,
+  .paste-btn:not(:disabled):active,
   .correction-btn:active,
   .correction-popover-btn:active,
   .week-range-btn:active,

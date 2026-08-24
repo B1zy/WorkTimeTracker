@@ -1,6 +1,6 @@
 import { useSettings } from "../contexts/SettingsContext";
 import { formatDuration } from "../utils/dateUtils";
-import type { SummaryState } from "../utils/weekSummary";
+import { carryoverPercent, nominalTargetPercent, type SummaryState } from "../utils/weekSummary";
 import { WeekNav } from "./WeekNav";
 import { SummaryGauge } from "./SummaryGauge";
 import { CorrectionInput } from "./CorrectionInput";
@@ -12,10 +12,10 @@ interface WeekHeaderProps {
   onNextWeek: () => void;
   onSelectWeek: (monday: Date) => void;
   adjustedMinutes: number;
+  requiredMinutes: number;
   state: SummaryState;
   label: string;
   fillPercent: number;
-  targetPercent: number;
   correctionMinutes: number;
   onCorrectionChange: (value: number) => void;
   isRecording: boolean;
@@ -30,10 +30,10 @@ export function WeekHeader({
   onNextWeek,
   onSelectWeek,
   adjustedMinutes,
+  requiredMinutes,
   state,
   label,
   fillPercent,
-  targetPercent,
   correctionMinutes,
   onCorrectionChange,
   isRecording,
@@ -41,6 +41,13 @@ export function WeekHeader({
   onToggleRecording,
 }: WeekHeaderProps) {
   const { settings } = useSettings();
+  const carryoverMinutes = settings.weeklyTargetMinutes - requiredMinutes;
+  const gaugeTooltip =
+    requiredMinutes !== settings.weeklyTargetMinutes
+      ? `${formatDuration(adjustedMinutes)} worked / ${formatDuration(requiredMinutes)} required (${formatDuration(
+          settings.weeklyTargetMinutes
+        )} target)`
+      : `${formatDuration(adjustedMinutes)} worked / ${formatDuration(settings.weeklyTargetMinutes)} target`;
 
   return (
     <header className="week-header">
@@ -53,11 +60,6 @@ export function WeekHeader({
       />
 
       <div className="week-summary">
-        <div className="summary-hours">
-          <span className="summary-total">{formatDuration(adjustedMinutes)}</span>
-          <span className="summary-target">/ {formatDuration(settings.weeklyTargetMinutes)} target</span>
-        </div>
-
         {/* Console-lamp status indicator, doubling as the clock-in/out
             control: click to start recording the current time, click again
             to stop and save the elapsed span as a Working session. */}
@@ -72,7 +74,14 @@ export function WeekHeader({
         </button>
 
         <div className="summary-meter">
-          <SummaryGauge state={state} fillPercent={fillPercent} targetPercent={targetPercent} />
+          <SummaryGauge
+            state={state}
+            fillPercent={fillPercent}
+            nominalTargetPercent={nominalTargetPercent(settings.weeklyTargetMinutes)}
+            carryoverMinutes={carryoverMinutes}
+            carryoverPercent={carryoverPercent(carryoverMinutes, settings.weeklyTargetMinutes)}
+            tooltip={gaugeTooltip}
+          />
           <CorrectionInput value={correctionMinutes} onChange={onCorrectionChange} />
         </div>
       </div>

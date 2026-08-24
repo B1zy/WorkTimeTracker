@@ -77,6 +77,14 @@ export function formatDuration(totalMinutes: number): string {
   return `${sign}${hours}h ${minutes}m`;
 }
 
+// Minutes -> "+6h 42m" / "-6h 42m" / "0m" -- for values that are inherently a
+// balance (ahead/behind) rather than a plain duration, where the sign itself
+// is the information.
+export function formatSignedDuration(minutes: number): string {
+  const sign = minutes > 0 ? "+" : minutes < 0 ? "-" : "";
+  return `${sign}${formatDuration(Math.abs(minutes))}`;
+}
+
 // "09:30:00" -> "9:30"
 export function formatTimeShort(timeStr: string): string {
   const [hours, minutes] = timeStr.split(":");

@@ -2,7 +2,7 @@ import { useMemo, type CSSProperties } from "react";
 import { useSettings } from "../contexts/SettingsContext";
 import { useOverviewData } from "../hooks/useOverviewData";
 import { buildCalendarYearWeeks } from "../utils/calendar";
-import { formatDuration, getMonday, toISODate } from "../utils/dateUtils";
+import { formatDuration, formatSignedDuration, getMonday, toISODate } from "../utils/dateUtils";
 import { ENTRY_TYPE_LABEL } from "../utils/timelineLayout";
 import { WEEKDAY_LABEL, workdayCount, workdayOffsets, type Weekday } from "../utils/workweek";
 import { classifySummaryState, classifyWeekdayAverageState, dayTargetMinutes, meterMaxMinutes } from "../utils/weekSummary";
@@ -25,11 +25,6 @@ function intensityClass(minutes: number, dayTarget: number): string {
   if (ratio <= 0.5) return "level-2";
   if (ratio <= 0.75) return "level-3";
   return "level-4";
-}
-
-function formatSignedDuration(minutes: number): string {
-  const sign = minutes > 0 ? "+" : minutes < 0 ? "-" : "";
-  return `${sign}${formatDuration(Math.abs(minutes))}`;
 }
 
 const RECENT_WEEK_COUNT = 13;

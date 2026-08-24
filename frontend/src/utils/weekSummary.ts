@@ -4,6 +4,7 @@ export type SummaryState = "under" | "target" | "over";
 
 export interface WeekSummary {
   adjustedMinutes: number;
+  requiredMinutes: number;
   state: SummaryState;
   label: string;
   fillPercent: number;
@@ -64,20 +65,51 @@ export function classifyWeekdayAverageState(actualMinutes: number, targetMinutes
   return classifyByDeviation(actualMinutes, targetMinutes, 0.1, 0.3);
 }
 
-export function computeWeekSummary(totalMinutes: number, correctionMinutes: number, weekTargetMinutes: number): WeekSummary {
+// `carryoverMinutes` is the running flex-time balance banked in from every
+// prior week (positive = worked ahead, negative = fell behind) -- see
+// entryTypeCounting.ts. It shifts how many hours are actually *required*
+// this week (the under/over math below) without changing the nominal weekly
+// target that gets displayed ("/ 42h target" stays 42h -- see the gauge's
+// credit/debt segment in SummaryGauge for how that shift gets drawn).
+export function computeWeekSummary(
+  totalMinutes: number,
+  correctionMinutes: number,
+  carryoverMinutes: number,
+  weekTargetMinutes: number
+): WeekSummary {
   const adjusted = totalMinutes + correctionMinutes;
-  const diff = adjusted - weekTargetMinutes;
-  const state = classifySummaryState(adjusted, weekTargetMinutes);
+  const required = weekTargetMinutes - carryoverMinutes;
+  const diff = adjusted - required;
+  const state = classifySummaryState(adjusted, required);
   const label = Math.abs(diff) < 3 && state === "target" ? "On Target" : `${formatDuration(Math.abs(diff))} ${diff < 0 ? "Under" : "Over"}`;
 
   return {
     adjustedMinutes: adjusted,
+    requiredMinutes: required,
     state,
     label,
     fillPercent: Math.min((adjusted / meterMaxMinutes(weekTargetMinutes)) * 100, 100),
   };
 }
 
-export function targetMarkerPercent(weekTargetMinutes: number): number {
-  return (weekTargetMinutes / meterMaxMinutes(weekTargetMinutes)) * 100;
+// Scales a minute value against the meter's fixed, nominal-target-based
+// range, clamped so nothing can push a marker off either end of the track.
+function meterPercent(minutes: number, weekTargetMinutes: number): number {
+  const percent = (minutes / meterMaxMinutes(weekTargetMinutes)) * 100;
+  return Math.min(Math.max(percent, 0), 100);
+}
+
+// The needle's position -- always the plain "42h" mark. It doesn't move for
+// carryover (see SummaryGauge's credit/debt segment for how that's shown
+// instead): a fixed goalpost is what makes "the bar reaches the goalpost"
+// mean the same thing every week.
+export function nominalTargetPercent(weekTargetMinutes: number): number {
+  return meterPercent(weekTargetMinutes, weekTargetMinutes);
+}
+
+// Magnitude of the banked carryover, in the same percent-of-meter units as
+// fillPercent/nominalTargetPercent, so SummaryGauge can lay the credit/debt
+// segment out purely in percentages without knowing about minutes at all.
+export function carryoverPercent(carryoverMinutes: number, weekTargetMinutes: number): number {
+  return meterPercent(Math.abs(carryoverMinutes), weekTargetMinutes);
 }

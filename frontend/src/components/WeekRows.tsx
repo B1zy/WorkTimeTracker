@@ -10,6 +10,9 @@ interface WeekRowsProps {
   onSessionClick: (session: WorkSession) => void;
   onSessionMove: (session: WorkSession, newStart: string, newEnd: string) => Promise<boolean>;
   onRemoveAllClick: (dateIso: string) => void;
+  onCopyClick: (dateIso: string) => void;
+  onPasteClick: (dateIso: string) => void;
+  hasClipboard: boolean;
 }
 
 export function WeekRows({ weekDays, sessionsByDate, ...callbacks }: WeekRowsProps) {
