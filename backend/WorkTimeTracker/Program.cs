@@ -16,7 +16,7 @@ builder.Services.AddOpenApi();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddDbContext<WorkSessionContext>(opt => opt.UseSqlite("Data Source=worksession.db"));
 builder.Services.AddScoped<ISessionService, SessionService>();
-
+builder.Services.AddHttpClient();
 // Solo local app served from a plain static file server (Live Server, `npx serve`, etc.),
 // so the frontend's port isn't fixed. Allowing any origin is fine here since there's no
 // auth/credentials involved.
