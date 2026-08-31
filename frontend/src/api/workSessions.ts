@@ -26,7 +26,7 @@ async function handleResponse<T>(response: Response): Promise<T> {
 
 // GET /api/WorkSessions?startDate=...&endDate=...
 export async function getSessions(startDate: string, endDate: string): Promise<WorkSession[]> {
-  const url = `${BASE_URL}?startDate=${startDate}&endDate=${endDate}`;
+  const url = `${BASE_URL}?startDate=${encodeURIComponent(startDate)}&endDate=${encodeURIComponent(endDate)}`;
   const response = await fetch(url);
   return handleResponse<WorkSession[]>(response);
 }

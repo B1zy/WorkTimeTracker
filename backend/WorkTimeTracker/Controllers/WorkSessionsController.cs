@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using WorkTimeTracker.DTOs;
 using WorkTimeTracker.Models;
 using WorkTimeTracker.Services;
 
@@ -37,14 +38,12 @@ namespace WorkTimeTracker.Controllers
         }
 
         // PUT: api/WorkSessions/5
-        // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754
+        // Binds a DTO (not the entity) with no Id field, so the id always comes
+        // from the route -- a client can't overpost one to target a different row.
         [HttpPut("{id}")]
-        public IActionResult PutWorkSession(int id, WorkSession workSession)
+        public IActionResult PutWorkSession(int id, WorkSessionWriteDto dto)
         {
-            if (id != workSession.Id)
-            {
-                return BadRequest();
-            }
+            var workSession = ToEntity(dto, id);
 
             try
             {
@@ -63,10 +62,13 @@ namespace WorkTimeTracker.Controllers
         }
 
         // POST: api/WorkSessions
-        // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754
+        // Binds a DTO (not the entity), so a client can't overpost an Id or any
+        // other field the entity might gain later.
         [HttpPost]
-        public ActionResult<WorkSession> PostWorkSession(WorkSession workSession)
+        public ActionResult<WorkSession> PostWorkSession(WorkSessionWriteDto dto)
         {
+            var workSession = ToEntity(dto, id: 0);
+
             try
             {
                 _sessionService.CreateSession(workSession);
@@ -78,6 +80,18 @@ namespace WorkTimeTracker.Controllers
 
             return CreatedAtAction(nameof(GetWorkSession), new { id = workSession.Id }, workSession);
         }
+
+        private static WorkSession ToEntity(WorkSessionWriteDto dto, int id) => new()
+        {
+            Id = id,
+            Name = dto.Name?.Trim() ?? string.Empty,
+            Description = dto.Description?.Trim() ?? string.Empty,
+            Location = dto.Location,
+            EntryType = dto.EntryType,
+            Date = dto.Date,
+            Start = dto.Start,
+            End = dto.End,
+        };
 
         // DELETE: api/WorkSessions/5
         [HttpDelete("{id}")]

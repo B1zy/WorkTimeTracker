@@ -2711,3 +2711,37 @@ select:focus {
   transition-delay: 0s !important;
   scroll-behavior: auto !important;
 }
+
+.app-crash {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
+  max-width: 420px;
+  margin: 15vh auto 0;
+  padding: 24px;
+}
+.app-crash h1 {
+  font-family: var(--font-display);
+  font-size: 1.2rem;
+  color: var(--text-primary);
+}
+.app-crash p {
+  color: var(--text-secondary);
+}
+.app-crash button {
+  padding: 8px 16px;
+  font-family: var(--font-display);
+  font-size: 0.85rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  border-radius: var(--radius);
+  cursor: pointer;
+  border: none;
+  background: var(--accent);
+  color: var(--text-on-accent);
+}
+.app-crash button:hover {
+  filter: brightness(1.1);
+}

@@ -3,8 +3,8 @@
 // localStorage and would be lost with browser data.
 
 import type { NewWorkSession, WorkSession } from "../types/WorkSession";
-import type { AppSettings } from "./settings";
-import type { CorrectionsByWeek } from "./corrections";
+import { sanitizeSettings, type AppSettings } from "./settings";
+import { sanitizeCorrections, type CorrectionsByWeek } from "./corrections";
 
 export const BACKUP_FORMAT = "worktimetracker-backup";
 export const BACKUP_VERSION = 1;
@@ -70,7 +70,18 @@ export function parseBackup(text: string): BackupFile {
     throw new Error("This backup's session data is missing or malformed.");
   }
 
-  return candidate as BackupFile;
+  // settings/corrections come from a file the user picked off disk, not from
+  // our own localStorage write path -- run them through the same sanitizers
+  // loadSettings()/loadCorrections() use rather than trusting the shape.
+  // Only sanitize when the field is actually present, so a legacy/partial
+  // backup missing one still leaves the caller's own "is it there?" check
+  // (and thus the current in-app value) alone rather than forcing defaults.
+  return {
+    ...candidate,
+    sessions: candidate.sessions,
+    settings: candidate.settings === undefined ? undefined : sanitizeSettings(candidate.settings),
+    corrections: candidate.corrections === undefined ? undefined : sanitizeCorrections(candidate.corrections),
+  } as BackupFile;
 }
 
 export function backupFilename(prefix = "worktimetracker-backup"): string {

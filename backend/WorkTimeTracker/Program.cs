@@ -19,17 +19,27 @@ builder.Services.AddScoped<ISessionService, SessionService>();
 builder.Services.AddHttpClient();
 // Solo local app served from a plain static file server (Live Server, `npx serve`, etc.),
 // so the frontend's port isn't fixed. Allowing any origin is fine here since there's no
-// auth/credentials involved.
+// auth/credentials involved -- but the method/header list is still narrowed to what the
+// app actually uses, rather than opening both up wholesale.
 const string DevCorsPolicy = "DevCorsPolicy";
 builder.Services.AddCors(options =>
 {
     options.AddPolicy(DevCorsPolicy, policy =>
     {
-        policy.AllowAnyOrigin().AllowAnyMethod().AllowAnyHeader();
+        policy.AllowAnyOrigin()
+            .WithMethods("GET", "POST", "PUT", "DELETE")
+            .WithHeaders("Content-Type");
     });
 });
 
+// Unhandled exceptions are logged and turned into a generic 500 rather than
+// crashing the request or leaking exception details to the client.
+builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
+builder.Services.AddProblemDetails();
+
 var app = builder.Build();
+
+app.UseExceptionHandler();
 
 // Apply any pending EF Core migrations on startup so the SQLite file always
 // has the current schema without a separate manual migration step.

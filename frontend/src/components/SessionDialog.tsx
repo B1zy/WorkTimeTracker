@@ -162,6 +162,7 @@ function SessionForm({ state, onClose }: SessionFormProps) {
           type="text"
           placeholder={ENTRY_TYPE_LABEL[entryType]}
           value={name}
+          maxLength={200}
           onChange={(e) => setName(e.target.value)}
         />
       </div>
@@ -172,6 +173,7 @@ function SessionForm({ state, onClose }: SessionFormProps) {
           id="description-input"
           type="text"
           value={description}
+          maxLength={1000}
           onChange={(e) => setDescription(e.target.value)}
         />
       </div>

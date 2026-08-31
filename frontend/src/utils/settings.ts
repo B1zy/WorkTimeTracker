@@ -98,23 +98,50 @@ export const COLOR_LABEL: Record<keyof SettingsColors, string> = {
   typeLunch: "Lunch",
 };
 
+// Rebuilds a settings object field-by-field from an untrusted source (a
+// localStorage blob or an imported backup file), falling back to defaults
+// for anything missing or the wrong type. Never trusts the shape wholesale --
+// see the NOTE at the top of this file.
+function isFiniteNumber(value: unknown): value is number {
+  return typeof value === "number" && Number.isFinite(value);
+}
+
+export function sanitizeSettings(raw: unknown): AppSettings {
+  if (!raw || typeof raw !== "object") return DEFAULT_SETTINGS;
+  const parsed = raw as Partial<AppSettings>;
+
+  return {
+    weeklyTargetMinutes: isFiniteNumber(parsed.weeklyTargetMinutes)
+      ? parsed.weeklyTargetMinutes
+      : DEFAULT_WEEKLY_TARGET_MINUTES,
+    colors: sanitizeColors(parsed.colors),
+    timelineStartMin: isFiniteNumber(parsed.timelineStartMin) ? parsed.timelineStartMin : DEFAULT_TIMELINE_START_MIN,
+    timelineEndMin: isFiniteNumber(parsed.timelineEndMin) ? parsed.timelineEndMin : DEFAULT_TIMELINE_END_MIN,
+    entryTypeCounting: sanitizeCounting(parsed.entryTypeCounting),
+    workdays: sanitizeWorkdays(parsed.workdays),
+    animationsEnabled: typeof parsed.animationsEnabled === "boolean" ? parsed.animationsEnabled : true,
+    settingsSectionOrder: Array.isArray(parsed.settingsSectionOrder)
+      ? parsed.settingsSectionOrder.filter((id): id is string => typeof id === "string")
+      : [],
+  };
+}
+
+function sanitizeColors(raw: unknown): SettingsColors {
+  const result = { ...DEFAULT_COLORS };
+  if (!raw || typeof raw !== "object") return result;
+
+  for (const key of Object.keys(result) as (keyof SettingsColors)[]) {
+    const value = (raw as Record<string, unknown>)[key];
+    if (typeof value === "string") result[key] = value;
+  }
+  return result;
+}
+
 export function loadSettings(): AppSettings {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return DEFAULT_SETTINGS;
-    const parsed = JSON.parse(raw) as Partial<AppSettings>;
-    return {
-      weeklyTargetMinutes: parsed.weeklyTargetMinutes ?? DEFAULT_WEEKLY_TARGET_MINUTES,
-      colors: { ...DEFAULT_COLORS, ...parsed.colors },
-      timelineStartMin: parsed.timelineStartMin ?? DEFAULT_TIMELINE_START_MIN,
-      timelineEndMin: parsed.timelineEndMin ?? DEFAULT_TIMELINE_END_MIN,
-      entryTypeCounting: sanitizeCounting(parsed.entryTypeCounting),
-      workdays: sanitizeWorkdays(parsed.workdays),
-      animationsEnabled: parsed.animationsEnabled ?? true,
-      settingsSectionOrder: Array.isArray(parsed.settingsSectionOrder)
-        ? parsed.settingsSectionOrder.filter((id): id is string => typeof id === "string")
-        : [],
-    };
+    return sanitizeSettings(JSON.parse(raw));
   } catch {
     return DEFAULT_SETTINGS;
   }
