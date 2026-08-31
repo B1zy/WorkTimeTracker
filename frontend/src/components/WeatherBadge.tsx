@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { weatherCodeLabel, weatherIconKind, type DayWeather } from "../utils/weather";
+import { weatherIconKind, type DayWeather } from "../utils/weather";
 import { WeatherIcon } from "./WeatherIcon";
 
 interface WeatherBadgeProps {
@@ -49,7 +49,7 @@ export function WeatherBadge({ day, weekdayLabel, dateLabel }: WeatherBadgeProps
   if (!day) return null;
 
   const kind = weatherIconKind(day.code);
-  const label = weatherCodeLabel(day.code);
+  const label = day.conditionText;
   const hours = sampleHours(day.hours);
 
   return (

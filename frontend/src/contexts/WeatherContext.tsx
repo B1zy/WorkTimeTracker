@@ -16,8 +16,8 @@ const WeatherContext = createContext<WeatherContextValue | null>(null);
 
 // Sessions rarely stay open long enough for a day's forecast to meaningfully
 // change, so one fetch per browser tab session (keyed to the location) is
-// plenty -- this just avoids re-hitting Open-Meteo on every remount (e.g.
-// switching between This Week / Overview) within the same session.
+// plenty -- this just avoids re-hitting the backend's weather proxy on every
+// remount (e.g. switching between This Week / Overview) within the same session.
 const CACHE_PREFIX = "worktimetracker.weatherCache.v1:";
 
 function cacheKey(location: WeatherLocation): string {

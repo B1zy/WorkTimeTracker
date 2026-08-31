@@ -1,4 +1,5 @@
 using System.Text.Json.Serialization;
+using Microsoft.Extensions.Options;
 using WorkTimeTracker.Models;
 using WorkTimeTracker.Services;
 using Microsoft.EntityFrameworkCore;
@@ -17,6 +18,13 @@ builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddDbContext<WorkSessionContext>(opt => opt.UseSqlite("Data Source=worksession.db"));
 builder.Services.AddScoped<ISessionService, SessionService>();
 builder.Services.AddHttpClient();
+
+builder.Services.Configure<WeatherApiOptions>(builder.Configuration.GetSection("WeatherApi"));
+builder.Services.AddHttpClient<IWeatherService, WeatherService>((sp, client) =>
+{
+    var options = sp.GetRequiredService<IOptions<WeatherApiOptions>>().Value;
+    client.BaseAddress = new Uri(options.BaseUrl);
+});
 // Solo local app served from a plain static file server (Live Server, `npx serve`, etc.),
 // so the frontend's port isn't fixed. Allowing any origin is fine here since there's no
 // auth/credentials involved -- but the method/header list is still narrowed to what the

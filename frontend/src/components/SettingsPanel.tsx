@@ -304,8 +304,8 @@ export function SettingsPanel({ onClearAllData, onExportData, onImportData }: Se
       <>
         <h3 className="settings-section-title">Weather</h3>
         <p className="settings-hint">
-          Shows a small forecast icon next to each day. Uses your browser's location -- nothing is sent anywhere but
-          the (keyless, public) Open-Meteo API.
+          Shows a small forecast icon next to each day. Uses your browser's location, sent to this app's own backend,
+          which looks up the forecast for you.
         </p>
         <div className="settings-weather-row">
           {location ? (
