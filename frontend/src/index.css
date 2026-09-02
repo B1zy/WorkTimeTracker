@@ -1913,94 +1913,34 @@ select:focus {
   flex: 1.4 1 0;
 }
 
-/* A real grid rather than the masonry (CSS columns) this used to be. "auto-
-   fit, minmax(260px, 1fr)" fits several equal-width cards per row on a
-   normal desktop width and drops columns as it narrows. Every card is a
-   direct grid item (see SettingsPanel/SortableSection) so free
-   drag-to-reorder can place any card in any slot -- nothing is pre-grouped
-   into a fixed sub-column anymore. align-items is the default (stretch): the
-   grid item (.settings-grid-cell) fills the row's full height, so that a
-   drag knows a card's *true* cell bounds -- the visible .settings-section
-   inside stays its own separate shrink-to-content, top-aligned self (see
-   below), so a short card like Timebar range still doesn't visually grow to
-   match a denser neighbor; only its invisible hit-region does. */
-.settings-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-  gap: 12px;
+/* The main Settings panel is a plain stacked list of category cards --
+   after trying a drag-to-reorder grid and then a freeform drag canvas, both
+   proved less "intuitive" than just always showing every setting in the
+   same predictable place. One column keeps every card full-width, which
+   sidesteps the whole "cards of different heights leave gaps when sharing
+   a row" problem that a multi-column layout kept running into. */
+.settings-panel-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
   margin-top: 16px;
 }
 
-.settings-grid-cell {
-  display: flex;
-  flex-direction: column;
-}
-
 .settings-section {
-  position: relative;
   background: var(--surface-raised);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  padding: 12px 14px;
+  padding: 18px 20px;
   display: flex;
   flex-direction: column;
 }
 
-/* Edit-layout mode (see SettingsPanel's "Edit Layout" button): a dashed
-   accent border marks every card as pick-up-able, without needing an actual
-   grid overlay -- the grid itself stays invisible, this is just "these are
-   the things that move." The whole card is the drag surface (see
-   useSectionReorder) -- press-and-hold anywhere on it that isn't an actual
-   control -- hence cursor:grab here rather than on some smaller handle; a
-   real input/select/button inside still shows its own cursor, since a more
-   specific rule on the element itself wins over this inherited one.
-   touch-action: none so a touch-drag doesn't also try to scroll the page. */
-.settings-section.is-editable {
-  border-style: dashed;
-  border-color: var(--border-strong);
-  cursor: grab;
-  touch-action: none;
-}
-.settings-section.is-editable:active {
-  cursor: grabbing;
-}
-
-/* The picked-up card: fixed-position, glued to the pointer (see
-   useSectionReorder) so it tracks the cursor exactly no matter how many
-   times its underlying grid slot has swapped since pickup. Its empty
-   .settings-grid-cell sibling (see SortableSection) holds its old grid cell
-   in the meantime -- naturally invisible with no content of its own -- so
-   lifting it doesn't itself reflow anything; only an actual swap does, and
-   that's an instant re-render into a different real cell, not something to
-   animate between. */
-.settings-section.is-dragging {
-  z-index: 30;
-  box-shadow: 0 16px 32px rgba(0, 0, 0, 0.55);
-  border-color: var(--accent);
-  border-style: solid;
-  cursor: grabbing;
-}
-
-.settings-drag-handle {
-  position: absolute;
-  top: 8px;
-  right: 8px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 20px;
-  height: 20px;
-  color: var(--text-dim);
-}
-.settings-section.is-editable:hover .settings-drag-handle {
-  color: var(--accent);
-}
-
 /* Every card in the main panel shares the same shape: a mono group label,
-   then controls, then one muted help line -- the mono face is scoped to this
-   context (not the sidebar's color-section titles) so it reads as a distinct
+   then a column of label/control rows (see .settings-row-grid), then
+   sometimes a muted help line -- the mono face is scoped to this context
+   (not the sidebar's color-section titles) so it reads as a distinct
    "settings field group" label rather than the sidebar's card heading. */
-.settings-grid .settings-section-title {
+.settings-panel-list .settings-section-title {
   font-family: var(--font-mono);
 }
 
@@ -2023,10 +1963,6 @@ select:focus {
 .settings-section-heading-row .settings-section-title {
   margin-bottom: 0;
 }
-.settings-edit-layout-actions {
-  display: flex;
-  gap: 6px;
-}
 
 .settings-hint {
   margin: 6px 0 0;
@@ -2035,11 +1971,31 @@ select:focus {
   color: var(--text-dim);
 }
 
-.settings-section .form-row {
-  margin-bottom: 8px;
+/* Fixed label column + flexible control column, shared by every row across
+   every card in the main panel, so every control lines up on one left edge
+   -- the same "label left, control right" shape as a native settings pane.
+   .settings-row is display:contents -- its label/control become direct
+   children of the grid rather than nesting an extra row per setting.
+   .settings-row-full opts a child *out* of that pairing (a hint line, a
+   preview bar, a divider) to span both columns as its own full-width row
+   instead, right where it sits in the markup. */
+.settings-row-grid {
+  display: grid;
+  grid-template-columns: minmax(0, max-content) 1fr;
+  align-items: center;
+  row-gap: 14px;
+  column-gap: 20px;
 }
-.settings-section .form-row:last-child {
-  margin-bottom: 0;
+.settings-row {
+  display: contents;
+}
+.settings-row-label {
+  font-size: 0.8rem;
+  color: var(--text-primary);
+  white-space: nowrap;
+}
+.settings-row-full {
+  grid-column: 1 / -1;
 }
 
 /* Weekly target: the bare number input's meaning (hours per week) doesn't
@@ -2061,12 +2017,14 @@ select:focus {
 }
 
 /* Timebar range: two real clock fields on one row instead of two stacked,
-   separately-labelled raw-hour fields. */
+   separately-labelled raw-hour fields. width: fit-content keeps the pair
+   compact instead of stretching across its (possibly much wider) row-grid
+   column. */
 .settings-time-range-row {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 8px;
+  gap: 10px;
+  width: fit-content;
 }
 .settings-time-range-to {
   flex-shrink: 0;
@@ -2078,9 +2036,11 @@ select:focus {
   color: var(--text-dim);
 }
 /* The range as a shape, not arithmetic: a 24h track with the selected window
-   filled, ticked at the day's start/middle/end. */
+   filled, ticked at the day's start/middle/end. Capped to the same compact
+   width as the time fields above it (see .settings-time-range-row) rather
+   than stretching across the row-grid's full control column. */
 .settings-time-range-preview {
-  margin-top: 12px;
+  max-width: 320px;
 }
 .settings-time-range-track {
   position: relative;
@@ -2133,11 +2093,6 @@ select:focus {
   border-color: var(--accent);
   color: var(--accent);
 }
-.settings-reset-btn.is-active {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: var(--text-on-accent);
-}
 
 .settings-color-grid {
   display: flex;
@@ -2184,8 +2139,12 @@ select:focus {
 }
 
 /* Same chip language as .settings-weekday, sized for a single "On"/"Off"
-   word rather than a row of day initials. */
+   word rather than a row of day initials. justify-self: start keeps it a
+   compact button instead of stretching across its row-grid column (CSS
+   Grid's default for a direct grid item, which is what this is -- see
+   .settings-row in SettingsPanel). */
 .settings-toggle-btn {
+  justify-self: start;
   padding: 5px 14px;
   font-family: var(--font-display);
   font-size: 0.72rem;
@@ -2207,29 +2166,14 @@ select:focus {
   font-weight: 800;
 }
 
-/* Fixed label column + flexible control column, shared across every row, so
-   every select lines up on one left edge and one width. .settings-counting-
-   row is display:contents -- its label/select become direct children of the
-   grid rather than nesting an extra flex row per type. */
-.settings-counting-grid {
-  display: grid;
-  grid-template-columns: auto 1fr;
-  align-items: center;
-  row-gap: 8px;
-  column-gap: 10px;
-}
-.settings-counting-row {
-  display: contents;
-}
-.settings-counting-label {
-  font-size: 0.76rem;
-  color: var(--text-primary);
-  white-space: nowrap;
-}
-.settings-counting-select {
+/* The "What counts as worked time" selects -- capped width so they don't
+   stretch across the row-grid's full (now much wider, single-column-card)
+   control column. */
+.settings-row-select {
   width: 100%;
-  font-size: 0.74rem;
-  padding: 5px 24px 5px 7px;
+  max-width: 280px;
+  font-size: 0.78rem;
+  padding: 6px 26px 6px 9px;
   /* Custom chevron so the native one doesn't clash with the field's own
      border/radius treatment -- matches the shared input/select field look
      instead of the browser's default control chrome. */
@@ -2237,9 +2181,9 @@ select:focus {
   -webkit-appearance: none;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%23B3A488' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
-  background-position: right 8px center;
+  background-position: right 9px center;
 }
-.settings-counting-select:disabled {
+.settings-row-select:disabled {
   opacity: 0.55;
   cursor: not-allowed;
 }
@@ -2262,11 +2206,10 @@ select:focus {
 .settings-backup-actions {
   display: flex;
   gap: 6px;
-  margin-bottom: 6px;
+  width: fit-content;
 }
 .settings-backup-actions .btn-secondary {
-  flex: 1;
-  padding: 6px 8px;
+  padding: 6px 12px;
   font-size: 0.72rem;
 }
 
@@ -2278,7 +2221,6 @@ select:focus {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin-top: 8px;
 }
 .settings-weather-row .btn-secondary {
   padding: 6px 10px;
@@ -2293,6 +2235,9 @@ select:focus {
   color: var(--state-over);
 }
 
+.settings-danger-actions {
+  max-width: 320px;
+}
 .settings-clear-btn {
   width: 100%;
   padding: 6px 8px;

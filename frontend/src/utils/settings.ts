@@ -35,12 +35,6 @@ export interface AppSettings {
   // either one turns animations off, since a user might want them off here
   // without changing a system-wide accessibility setting.
   animationsEnabled: boolean;
-  // Drag-to-reorder position of the cards in the main Settings panel, as a
-  // list of section ids. Deliberately loose here -- may be empty, short, or
-  // contain ids from a since-removed section; SettingsPanel reconciles it
-  // against the current canonical section list on every render, so this is
-  // just "whatever was saved," not a guaranteed-valid permutation.
-  settingsSectionOrder: string[];
 }
 
 export const DEFAULT_COLORS: SettingsColors = {
@@ -65,7 +59,6 @@ export const DEFAULT_SETTINGS: AppSettings = {
   entryTypeCounting: DEFAULT_ENTRY_TYPE_COUNTING,
   workdays: DEFAULT_WORKDAYS,
   animationsEnabled: true,
-  settingsSectionOrder: [],
 };
 
 const STORAGE_KEY = "worktimetracker.settings.v1";
@@ -120,9 +113,6 @@ export function sanitizeSettings(raw: unknown): AppSettings {
     entryTypeCounting: sanitizeCounting(parsed.entryTypeCounting),
     workdays: sanitizeWorkdays(parsed.workdays),
     animationsEnabled: typeof parsed.animationsEnabled === "boolean" ? parsed.animationsEnabled : true,
-    settingsSectionOrder: Array.isArray(parsed.settingsSectionOrder)
-      ? parsed.settingsSectionOrder.filter((id): id is string => typeof id === "string")
-      : [],
   };
 }
 

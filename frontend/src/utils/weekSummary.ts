@@ -27,7 +27,7 @@ export function dayTargetMinutes(weekTargetMinutes: number, workdayCount: number
 }
 
 export function dayTargetLabel(weekTargetMinutes: number, workdayCount: number): string {
-  return `${(dayTargetMinutes(weekTargetMinutes, workdayCount) / 60).toFixed(1)}h`;
+  return formatDuration(dayTargetMinutes(weekTargetMinutes, workdayCount));
 }
 
 // Color bands based on how far off a target we are, and in which direction:
@@ -67,10 +67,12 @@ export function classifyWeekdayAverageState(actualMinutes: number, targetMinutes
 
 // `carryoverMinutes` is the running flex-time balance banked in from every
 // prior week (positive = worked ahead, negative = fell behind) -- see
-// entryTypeCounting.ts. It shifts how many hours are actually *required*
-// this week (the under/over math below) without changing the nominal weekly
-// target that gets displayed ("/ 42h target" stays 42h -- see the gauge's
-// credit/debt segment in SummaryGauge for how that shift gets drawn).
+// entryTypeCounting.ts. `requiredMinutes` below (target minus that balance)
+// is exposed only for the "worked / required" tooltip and the gauge's
+// credit/debt segment -- it must NOT feed the label or state, or the badge
+// stops answering "how did *this* week go" and starts mixing in every prior
+// week's history, so a week that's dead on its own target shows some
+// unrelated multi-week balance instead of its own ~0.
 export function computeWeekSummary(
   totalMinutes: number,
   correctionMinutes: number,
@@ -79,8 +81,8 @@ export function computeWeekSummary(
 ): WeekSummary {
   const adjusted = totalMinutes + correctionMinutes;
   const required = weekTargetMinutes - carryoverMinutes;
-  const diff = adjusted - required;
-  const state = classifySummaryState(adjusted, required);
+  const diff = adjusted - weekTargetMinutes;
+  const state = classifySummaryState(adjusted, weekTargetMinutes);
   const label = Math.abs(diff) < 3 && state === "target" ? "On Target" : `${formatDuration(Math.abs(diff))} ${diff < 0 ? "Under" : "Over"}`;
 
   return {

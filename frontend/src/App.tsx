@@ -45,9 +45,9 @@ function App() {
 
   const { settings, updateSettings } = useSettings();
   const { sessionsByDate, totalMinutes, error: fetchError, refetch } = useWeekData(currentMonday);
-  const { carryoverMinutes, refetch: refetchCarryover } = useCarryoverMinutes(currentMonday);
   const dialog = useSessionDialog();
   const { corrections, getCorrection, setCorrection, replaceAll: replaceCorrections } = useWeekCorrections();
+  const { carryoverMinutes, refetch: refetchCarryover } = useCarryoverMinutes(currentMonday, corrections);
   const recording = useLiveRecording();
   const { message: toastMessage, showToast } = useToast();
 
@@ -387,6 +387,7 @@ function App() {
             onClearAllData={handleClearAllData}
             onExportData={handleExportData}
             onImportData={handleImportData}
+            corrections={corrections}
           />
         )}
       </div>

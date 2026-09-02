@@ -6,6 +6,7 @@ import { formatDuration, formatSignedDuration, getMonday, toISODate } from "../u
 import { ENTRY_TYPE_LABEL } from "../utils/timelineLayout";
 import { WEEKDAY_LABEL, workdayCount, workdayOffsets, type Weekday } from "../utils/workweek";
 import { classifySummaryState, classifyWeekdayAverageState, dayTargetMinutes, meterMaxMinutes } from "../utils/weekSummary";
+import type { CorrectionsByWeek } from "../utils/corrections";
 import type { EntryType } from "../types/WorkSession";
 import { SettingsPanel } from "./SettingsPanel";
 import { SettingsSidebar } from "./SettingsSidebar";
@@ -36,9 +37,10 @@ interface OverviewViewProps {
     file: File,
     onProgress?: (done: number, total: number) => void
   ) => Promise<{ imported: number; failed: number }>;
+  corrections: CorrectionsByWeek;
 }
 
-export function OverviewView({ onClearAllData, onExportData, onImportData }: OverviewViewProps) {
+export function OverviewView({ onClearAllData, onExportData, onImportData, corrections }: OverviewViewProps) {
   const { settings } = useSettings();
   const year = useMemo(() => new Date().getFullYear(), []);
   const todayMonday = useMemo(() => getMonday(new Date()), []);
@@ -100,14 +102,32 @@ export function OverviewView({ onClearAllData, onExportData, onImportData }: Ove
   const todayMondayIso = toISODate(todayMonday);
   const currentWeekIndex = weeks.findIndex((week) => toISODate(week[0]) === todayMondayIso);
 
-  // Running balance carried in from every tracked week strictly before the
-  // current one (the current, still-in-progress week is excluded -- its own
-  // progress already shows in the This Week gauge). Untracked weeks don't
-  // count against you either.
+  // Running balance carried in from every week strictly before the current
+  // one (the current, still-in-progress week is excluded -- its own progress
+  // already shows in the This Week gauge), starting from the first week that
+  // has any activity at all (a session or a correction) -- weeks before that
+  // haven't started being tracked and don't count, but every week from there
+  // on does, so a completely missed week still subtracts its full target
+  // rather than being silently skipped.
   const carryoverMinutes = useMemo(() => {
-    const priorWeeks = currentWeekIndex >= 0 ? weekTotals.slice(0, currentWeekIndex) : weekTotals;
-    return priorWeeks.reduce((sum, minutes) => (minutes !== 0 ? sum + (minutes - weekTarget) : sum), 0);
-  }, [weekTotals, weekTarget, currentWeekIndex]);
+    const priorCount = currentWeekIndex >= 0 ? currentWeekIndex : weekTotals.length;
+    let firstTrackedIndex = -1;
+    for (let i = 0; i < priorCount; i++) {
+      const correction = corrections[toISODate(weeks[i][0])] ?? 0;
+      if (weekTotals[i] !== 0 || correction !== 0) {
+        firstTrackedIndex = i;
+        break;
+      }
+    }
+    if (firstTrackedIndex === -1) return 0;
+
+    let sum = 0;
+    for (let i = firstTrackedIndex; i < priorCount; i++) {
+      const correction = corrections[toISODate(weeks[i][0])] ?? 0;
+      sum += weekTotals[i] + correction - weekTarget;
+    }
+    return sum;
+  }, [weekTotals, weeks, weekTarget, currentWeekIndex, corrections]);
 
   // One label per column where the month changes, matching GitHub's
   // month-header style above the grid. The year's first/last weeks can spill

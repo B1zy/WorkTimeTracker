@@ -5,6 +5,7 @@ import { addDays, getMonday, toISODate } from "../utils/dateUtils";
 import type { Weekday } from "../utils/workweek";
 import { useSettings } from "../contexts/SettingsContext";
 import type { WorkSession } from "../types/WorkSession";
+import type { CorrectionsByWeek } from "../utils/corrections";
 
 export interface UseCarryoverResult {
   carryoverMinutes: number;
@@ -14,18 +15,21 @@ export interface UseCarryoverResult {
 }
 
 // Running flex-time balance banked in from every earlier week: each prior
-// week that has entries contributes (that week's total - the weekly target),
-// and the balance just keeps accumulating (a banked surplus lowers what's
-// required later; a deficit raises it) until it's worked back to zero. Weeks
-// with no entries at all don't count either way -- they haven't happened
-// yet, not a shortfall.
+// week -- including one with nothing logged at all -- contributes (that
+// week's total - the weekly target), and the balance just keeps accumulating
+// (a banked surplus lowers what's required later; a deficit raises it) until
+// it's worked back to zero. A week only stops counting once it's *before*
+// the first week that has any activity (a session or a correction) -- that's
+// "haven't started using the app yet", not a shortfall; every week from
+// there on is a real week, so a completely missed one still counts as a full
+// deficit rather than being silently skipped.
 //
 // Mirrors OverviewView's own carryover stat, but relative to whatever week is
 // currently being viewed (`monday`) rather than to today -- capped at today's
 // Monday, though: viewing a *future* week must not count today's still-
 // in-progress week (or any other not-yet-complete week between now and then)
 // as a shortfall just because it's technically "before" the viewed week.
-export function useCarryoverMinutes(monday: Date): UseCarryoverResult {
+export function useCarryoverMinutes(monday: Date, corrections: CorrectionsByWeek): UseCarryoverResult {
   const { settings } = useSettings();
   const todayMonday = getMonday(new Date());
   const cutoffMonday = monday < todayMonday ? monday : todayMonday;
@@ -65,12 +69,27 @@ export function useCarryoverMinutes(monday: Date): UseCarryoverResult {
       totalsByWeek.set(weekIso, (totalsByWeek.get(weekIso) ?? 0) + minutes);
     }
 
+    // The first week with any activity at all -- a logged session or a
+    // manual correction -- marks where tracking actually starts; everything
+    // before it is out of scope, everything from it up to the cutoff (even a
+    // week with nothing in totalsByWeek) is a real week to walk.
+    const activeWeekIsos = [...totalsByWeek.keys(), ...Object.keys(corrections)].filter(
+      (iso) => iso < cutoffMondayIso
+    );
+    if (activeWeekIsos.length === 0) return 0;
+    const firstWeekIso = activeWeekIsos.reduce((min, iso) => (iso < min ? iso : min));
+
     let balance = 0;
-    for (const weekTotal of totalsByWeek.values()) {
-      balance += weekTotal - settings.weeklyTargetMinutes;
+    let cursor = new Date(`${firstWeekIso}T00:00:00`);
+    while (toISODate(cursor) < cutoffMondayIso) {
+      const weekIso = toISODate(cursor);
+      const weekTotal = totalsByWeek.get(weekIso) ?? 0;
+      const correction = corrections[weekIso] ?? 0;
+      balance += weekTotal + correction - settings.weeklyTargetMinutes;
+      cursor = addDays(cursor, 7);
     }
     return balance;
-  }, [sessions, settings.workdays, settings.entryTypeCounting, settings.weeklyTargetMinutes]);
+  }, [sessions, settings.workdays, settings.entryTypeCounting, settings.weeklyTargetMinutes, corrections, cutoffMondayIso]);
 
   return { carryoverMinutes, loading, error, refetch };
 }

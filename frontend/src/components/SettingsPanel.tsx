@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState, type ChangeEvent, type ReactNode } from "react";
+import { useRef, useState, type ChangeEvent, type ReactNode } from "react";
 import { useSettings } from "../contexts/SettingsContext";
 import { useWeather } from "../contexts/WeatherContext";
 import {
@@ -9,8 +9,6 @@ import {
 import { WEEKDAY_DISPLAY_ORDER, WEEKDAY_LABEL, type Weekday } from "../utils/workweek";
 import { ENTRY_TYPE_LABEL } from "../utils/timelineLayout";
 import { TimeField } from "./TimeField";
-import { SortableSection } from "./SortableSection";
-import { useSectionReorder } from "../hooks/useSectionReorder";
 import type { EntryType } from "../types/WorkSession";
 
 const ENTRY_TYPES: EntryType[] = ["Working", "Sick", "OvertimeCompensation", "Appointment", "Lunch"];
@@ -24,24 +22,6 @@ const SETTINGS_ENTRY_TYPE_LABEL: Partial<Record<EntryType, string>> = {
 
 const DAY_MINUTES = 24 * 60;
 
-// Canonical set of cards in the main Settings panel, in their default order.
-// This is the single source of truth for "what sections exist" -- a saved
-// settingsSectionOrder is reconciled against it below, so removing/renaming
-// a section here can't leave a stored layout pointing at nothing.
-const SETTINGS_SECTION_IDS = ["weekly-target", "what-counts", "animations", "timebar-range", "weather", "data-backup"] as const;
-
-// A saved order may be empty (nothing customized yet), missing ids (a
-// section was added since), or carrying stale ones (a section was removed) --
-// this always returns a valid permutation of the current section set:
-// whatever from the saved order still exists, in that order, then any
-// sections not yet placed appended at the end.
-function resolveSectionOrder(stored: string[]): string[] {
-  const known = new Set<string>(SETTINGS_SECTION_IDS);
-  const placed = stored.filter((id) => known.has(id));
-  const missing = SETTINGS_SECTION_IDS.filter((id) => !placed.includes(id));
-  return [...placed, ...missing];
-}
-
 interface SettingsPanelProps {
   onClearAllData: () => Promise<void>;
   onExportData: () => Promise<void>;
@@ -54,6 +34,12 @@ interface SettingsPanelProps {
 // Rendered inline at the bottom of the Overview tab (not a modal): the whole
 // point of moving it here was to have the chart and the settings that shape
 // it on one scrollable page instead of a popup you can't see the data behind.
+//
+// A plain, fixed-order stack of category cards -- after trying a
+// drag-to-reorder grid and then a freeform drag canvas, both proved less
+// intuitive than a settings page just always looking the same: every
+// control always lives in the same place, grouped by what it actually
+// affects, with no layout step of its own to think about.
 export function SettingsPanel({ onClearAllData, onExportData, onImportData }: SettingsPanelProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { settings, updateSettings } = useSettings();
@@ -62,34 +48,6 @@ export function SettingsPanel({ onClearAllData, onExportData, onImportData }: Se
   const [clearing, setClearing] = useState(false);
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
-  const [isEditingLayout, setIsEditingLayout] = useState(false);
-  // Snapshot of the order when editing began, so Cancel can put it back --
-  // reordering itself commits to settings live (see onReorder below), not
-  // just on Done, which is what makes a separate revert necessary.
-  const editSnapshotRef = useRef<string[] | null>(null);
-
-  const order = useMemo(() => resolveSectionOrder(settings.settingsSectionOrder), [settings.settingsSectionOrder]);
-  const { draggingId, dragRect, registerItemRef, getSurfaceProps } = useSectionReorder({
-    order,
-    onReorder: (next) => updateSettings((prev) => ({ ...prev, settingsSectionOrder: next })),
-  });
-
-  function handleStartEditingLayout() {
-    editSnapshotRef.current = order;
-    setIsEditingLayout(true);
-  }
-
-  function handleDoneEditingLayout() {
-    setIsEditingLayout(false);
-  }
-
-  function handleCancelEditingLayout() {
-    if (editSnapshotRef.current) {
-      const snapshot = editSnapshotRef.current;
-      updateSettings((prev) => ({ ...prev, settingsSectionOrder: snapshot }));
-    }
-    setIsEditingLayout(false);
-  }
 
   function handleTargetHoursChange(event: ChangeEvent<HTMLInputElement>) {
     const hours = Number(event.target.value);
@@ -172,61 +130,65 @@ export function SettingsPanel({ onClearAllData, onExportData, onImportData }: Se
     }
   }
 
-  const sectionContent: Record<string, ReactNode> = {
-    "weekly-target": (
-      <>
-        <h3 className="settings-section-title">Weekly target</h3>
-        <div className="form-row">
-          <label htmlFor="weekly-target-input">Target</label>
-          <div className="settings-input-with-unit">
-            <input
-              id="weekly-target-input"
-              type="number"
-              min={1}
-              step={0.5}
-              value={settings.weeklyTargetMinutes / 60}
-              onChange={handleTargetHoursChange}
-            />
-            <span className="settings-input-unit">hours / week</span>
+  const cards: ReactNode = (
+    <>
+      <section className="settings-section">
+        <h3 className="settings-section-title">Work week</h3>
+        <div className="settings-row-grid">
+          <div className="settings-row">
+            <label htmlFor="weekly-target-input" className="settings-row-label">
+              Weekly target
+            </label>
+            <div className="settings-input-with-unit">
+              <input
+                id="weekly-target-input"
+                type="number"
+                min={1}
+                step={0.5}
+                value={settings.weeklyTargetMinutes / 60}
+                onChange={handleTargetHoursChange}
+              />
+              <span className="settings-input-unit">hours / week</span>
+            </div>
+          </div>
+          <div className="settings-row">
+            <span className="settings-row-label" id="workdays-label">
+              Work days
+            </span>
+            <div className="settings-weekday-row" role="group" aria-labelledby="workdays-label">
+              {WEEKDAY_DISPLAY_ORDER.map((day) => {
+                const checked = settings.workdays.includes(day);
+                const isLastRemaining = checked && settings.workdays.length === 1;
+                return (
+                  <button
+                    key={day}
+                    type="button"
+                    className={`settings-weekday${checked ? " is-on" : ""}`}
+                    aria-pressed={checked}
+                    disabled={isLastRemaining}
+                    title={isLastRemaining ? "At least one work day is required" : undefined}
+                    onClick={() => handleWorkdayToggle(day, !checked)}
+                  >
+                    {WEEKDAY_LABEL[day]}
+                  </button>
+                );
+              })}
+            </div>
           </div>
         </div>
-        <div className="form-row">
-          <label>Work days</label>
-          <div className="settings-weekday-row" role="group" aria-label="Work days">
-            {WEEKDAY_DISPLAY_ORDER.map((day) => {
-              const checked = settings.workdays.includes(day);
-              const isLastRemaining = checked && settings.workdays.length === 1;
-              return (
-                <button
-                  key={day}
-                  type="button"
-                  className={`settings-weekday${checked ? " is-on" : ""}`}
-                  aria-pressed={checked}
-                  disabled={isLastRemaining}
-                  title={isLastRemaining ? "At least one work day is required" : undefined}
-                  onClick={() => handleWorkdayToggle(day, !checked)}
-                >
-                  {WEEKDAY_LABEL[day]}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      </>
-    ),
+      </section>
 
-    "what-counts": (
-      <>
+      <section className="settings-section">
         <h3 className="settings-section-title">What counts as worked time</h3>
-        <div className="settings-counting-grid">
+        <div className="settings-row-grid">
           {ENTRY_TYPES.map((type) => (
-            <div key={type} className="settings-counting-row">
-              <label htmlFor={`counting-${type}`} className="settings-counting-label">
+            <div key={type} className="settings-row">
+              <label htmlFor={`counting-${type}`} className="settings-row-label">
                 {SETTINGS_ENTRY_TYPE_LABEL[type] ?? ENTRY_TYPE_LABEL[type]}
               </label>
               <select
                 id={`counting-${type}`}
-                className="settings-counting-select"
+                className="settings-row-select"
                 value={settings.entryTypeCounting[type]}
                 disabled={type === "Working"}
                 onChange={(e) => handleCountingChange(type, e.target.value as CountingMode)}
@@ -240,176 +202,158 @@ export function SettingsPanel({ onClearAllData, onExportData, onImportData }: Se
             </div>
           ))}
         </div>
-      </>
-    ),
+      </section>
 
-    animations: (
-      <>
-        <h3 className="settings-section-title">Animations</h3>
-        <div className="form-row">
-          <label htmlFor="animations-toggle">Card entrances, popovers, transitions</label>
-          <button
-            id="animations-toggle"
-            type="button"
-            className={`settings-toggle-btn${settings.animationsEnabled ? " is-on" : ""}`}
-            aria-pressed={settings.animationsEnabled}
-            onClick={handleToggleAnimations}
-          >
-            {settings.animationsEnabled ? "On" : "Off"}
-          </button>
-        </div>
-      </>
-    ),
-
-    "timebar-range": (
-      <>
-        <h3 className="settings-section-title">Timebar range</h3>
-        <div className="settings-time-range-row">
-          <TimeField
-            id="timeline-start-input"
-            value={settings.timelineStartMin}
-            onChange={handleTimelineStartChange}
-            ariaLabel="Starts at"
-            compact
-          />
-          <span className="settings-time-range-to">to</span>
-          <TimeField
-            id="timeline-end-input"
-            value={settings.timelineEndMin}
-            onChange={handleTimelineEndChange}
-            ariaLabel="Ends at"
-            compact
-          />
-        </div>
-        <div className="settings-time-range-preview">
-          <div className="settings-time-range-track">
-            <div
-              className="settings-time-range-fill"
-              style={{
-                left: `${(settings.timelineStartMin / DAY_MINUTES) * 100}%`,
-                width: `${((settings.timelineEndMin - settings.timelineStartMin) / DAY_MINUTES) * 100}%`,
-              }}
-            />
+      <section className="settings-section">
+        <h3 className="settings-section-title">Display</h3>
+        <div className="settings-row-grid">
+          <div className="settings-row">
+            <span className="settings-row-label">Timebar range</span>
+            <div className="settings-time-range-row">
+              <TimeField
+                id="timeline-start-input"
+                value={settings.timelineStartMin}
+                onChange={handleTimelineStartChange}
+                ariaLabel="Starts at"
+                compact
+              />
+              <span className="settings-time-range-to">to</span>
+              <TimeField
+                id="timeline-end-input"
+                value={settings.timelineEndMin}
+                onChange={handleTimelineEndChange}
+                ariaLabel="Ends at"
+                compact
+              />
+            </div>
           </div>
-          <div className="settings-time-range-ticks">
-            <span>00:00</span>
-            <span>12:00</span>
-            <span>24:00</span>
+          <div className="settings-time-range-preview settings-row-full">
+            <div className="settings-time-range-track">
+              <div
+                className="settings-time-range-fill"
+                style={{
+                  left: `${(settings.timelineStartMin / DAY_MINUTES) * 100}%`,
+                  width: `${((settings.timelineEndMin - settings.timelineStartMin) / DAY_MINUTES) * 100}%`,
+                }}
+              />
+            </div>
+            <div className="settings-time-range-ticks">
+              <span>00:00</span>
+              <span>12:00</span>
+              <span>24:00</span>
+            </div>
           </div>
-        </div>
-      </>
-    ),
 
-    weather: (
-      <>
-        <h3 className="settings-section-title">Weather</h3>
-        <p className="settings-hint">
-          Shows a small forecast icon next to each day. Uses your browser's location, sent to this app's own backend,
-          which looks up the forecast for you.
-        </p>
-        <div className="settings-weather-row">
-          {location ? (
-            <>
-              <span className="settings-weather-status">
-                Location set ({location.lat.toFixed(2)}, {location.lon.toFixed(2)})
-              </span>
-              <button type="button" className="btn-secondary" onClick={clearLocation}>
-                Turn off
-              </button>
-            </>
-          ) : (
-            <button type="button" className="btn-secondary" onClick={requestLocation} disabled={weatherLoading}>
-              {weatherLoading ? "Requesting…" : "Use my location"}
-            </button>
-          )}
-        </div>
-        {weatherError && (
-          <p className="settings-hint settings-weather-error">
-            {weatherError}
-            {permissionDenied && " You can re-enable location access for this site in your browser's settings."}
+          <div className="settings-row">
+            <span className="settings-row-label">Weather icons</span>
+            <div className="settings-weather-row">
+              {location ? (
+                <>
+                  <span className="settings-weather-status">
+                    Location set ({location.lat.toFixed(2)}, {location.lon.toFixed(2)})
+                  </span>
+                  <button type="button" className="btn-secondary" onClick={clearLocation}>
+                    Turn off
+                  </button>
+                </>
+              ) : (
+                <button type="button" className="btn-secondary" onClick={requestLocation} disabled={weatherLoading}>
+                  {weatherLoading ? "Requesting…" : "Use my location"}
+                </button>
+              )}
+            </div>
+          </div>
+          <p className="settings-hint settings-row-full">
+            Shows a small forecast icon next to each day. Uses your browser's location, sent to this app's own
+            backend, which looks up the forecast for you.
           </p>
-        )}
-      </>
-    ),
+          {weatherError && (
+            <p className="settings-hint settings-weather-error settings-row-full">
+              {weatherError}
+              {permissionDenied && " You can re-enable location access for this site in your browser's settings."}
+            </p>
+          )}
 
-    "data-backup": (
-      <>
-        <h3 className="settings-section-title">Data &amp; backup</h3>
-        <div className="settings-backup-actions">
-          <button type="button" className="btn-secondary" onClick={handleExport} disabled={busy}>
-            Export backup
-          </button>
-          <button
-            type="button"
-            className="btn-secondary"
-            onClick={() => fileInputRef.current?.click()}
-            disabled={busy}
-          >
-            Restore…
-          </button>
+          <div className="settings-row">
+            <label htmlFor="animations-toggle" className="settings-row-label">
+              Animations
+            </label>
+            <button
+              id="animations-toggle"
+              type="button"
+              className={`settings-toggle-btn${settings.animationsEnabled ? " is-on" : ""}`}
+              aria-pressed={settings.animationsEnabled}
+              onClick={handleToggleAnimations}
+            >
+              {settings.animationsEnabled ? "On" : "Off"}
+            </button>
+          </div>
         </div>
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept="application/json,.json"
-          hidden
-          onChange={handleFileChosen}
-        />
-        {status && <p className="settings-hint settings-backup-status">{status}</p>}
-        <hr className="settings-divider" />
-        <button
-          type="button"
-          className={`btn-delete settings-clear-btn${confirmingClear ? " is-confirming" : ""}`}
-          onClick={handleClearAllData}
-          disabled={clearing}
-        >
-          {confirmingClear ? "Really delete everything? Click again to confirm" : "Clear all data"}
-        </button>
-        {confirmingClear && (
-          <button type="button" className="btn-secondary settings-clear-cancel" onClick={() => setConfirmingClear(false)}>
-            Cancel
-          </button>
-        )}
-      </>
-    ),
-  };
+      </section>
+
+      <section className="settings-section">
+        <h3 className="settings-section-title">Data &amp; backup</h3>
+        <div className="settings-row-grid">
+          <div className="settings-row">
+            <span className="settings-row-label">Backup</span>
+            <div className="settings-backup-actions">
+              <button type="button" className="btn-secondary" onClick={handleExport} disabled={busy}>
+                Export backup
+              </button>
+              <button
+                type="button"
+                className="btn-secondary"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={busy}
+              >
+                Restore…
+              </button>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="application/json,.json"
+                hidden
+                onChange={handleFileChosen}
+              />
+            </div>
+          </div>
+          {status && <p className="settings-hint settings-backup-status settings-row-full">{status}</p>}
+
+          <hr className="settings-divider settings-row-full" />
+
+          <div className="settings-row">
+            <span className="settings-row-label">Danger zone</span>
+            <div className="settings-danger-actions">
+              <button
+                type="button"
+                className={`btn-delete settings-clear-btn${confirmingClear ? " is-confirming" : ""}`}
+                onClick={handleClearAllData}
+                disabled={clearing}
+              >
+                {confirmingClear ? "Really delete everything? Click again to confirm" : "Clear all data"}
+              </button>
+              {confirmingClear && (
+                <button
+                  type="button"
+                  className="btn-secondary settings-clear-cancel"
+                  onClick={() => setConfirmingClear(false)}
+                >
+                  Cancel
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      </section>
+    </>
+  );
 
   return (
     <section className="settings-inline">
       <div className="settings-section-heading-row">
         <h2 id="settings-title">Settings</h2>
-        <div className="settings-edit-layout-actions">
-          {isEditingLayout && (
-            <button type="button" className="settings-reset-btn" onClick={handleCancelEditingLayout}>
-              Cancel
-            </button>
-          )}
-          <button
-            type="button"
-            className={`settings-reset-btn${isEditingLayout ? " is-active" : ""}`}
-            aria-pressed={isEditingLayout}
-            onClick={isEditingLayout ? handleDoneEditingLayout : handleStartEditingLayout}
-          >
-            {isEditingLayout ? "Done" : "Edit Layout"}
-          </button>
-        </div>
       </div>
-
-      <div className={`settings-grid${isEditingLayout ? " is-editing" : ""}`}>
-        {order.map((id) => (
-          <SortableSection
-            key={id}
-            id={id}
-            isEditing={isEditingLayout}
-            isDragging={draggingId === id}
-            dragRect={draggingId === id ? dragRect : null}
-            registerItemRef={registerItemRef}
-            onSurfacePointerDown={getSurfaceProps(id).onPointerDown}
-          >
-            {sectionContent[id]}
-          </SortableSection>
-        ))}
-      </div>
+      <div className="settings-panel-list">{cards}</div>
     </section>
   );
 }
