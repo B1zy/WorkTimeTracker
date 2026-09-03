@@ -16,10 +16,11 @@ import { useDragToResize } from "../hooks/useDragToResize";
 import { useKeyboardAdjust } from "../hooks/useKeyboardAdjust";
 import { SessionTooltip } from "./SessionTooltip";
 
-// Hover delay before the tooltip appears -- long enough that skimming across
-// several blocks in a row doesn't flash one per block, short enough to still
-// feel responsive once you actually pause on one.
-const TOOLTIP_DELAY_MS = 350;
+// Hover delay before the tooltip appears -- kept at 0 (rather than removing
+// the timer) so scheduleTooltip/hideTooltip's cancel-on-leave logic still
+// applies: still fires via a real timeout, just on the next tick, instead of
+// synchronously inside the mouseenter handler.
+const TOOLTIP_DELAY_MS = 0;
 
 interface TimelineBlockProps {
   session: WorkSession;

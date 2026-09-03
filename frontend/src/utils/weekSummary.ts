@@ -65,6 +65,22 @@ export function classifyWeekdayAverageState(actualMinutes: number, targetMinutes
   return classifyByDeviation(actualMinutes, targetMinutes, 0.1, 0.3);
 }
 
+// Tighter bands for the yearly heatmap's day cells (see OverviewView's
+// dayCellClass), and deliberately direction-sensitive rather than
+// deviation-magnitude-only: falling short of a day's target is the thing
+// worth flagging with urgency, while running over it is never a problem (a
+// surplus just banks as carryover) -- so any day at or past its target
+// reads green no matter how far past, a shortfall of 5-20% reads amber, and
+// a shortfall beyond 20% reads red. "under"/"over" below name severity
+// tiers, not direction -- see classifyByDeviation's note above.
+export function classifyDayCellState(actualMinutes: number, targetMinutes: number): SummaryState {
+  if (targetMinutes <= 0) return "target";
+  const deviation = (actualMinutes - targetMinutes) / targetMinutes;
+  if (deviation >= -0.05) return "target";
+  if (deviation >= -0.2) return "under";
+  return "over";
+}
+
 // `carryoverMinutes` is the running flex-time balance banked in from every
 // prior week (positive = worked ahead, negative = fell behind) -- see
 // entryTypeCounting.ts. `requiredMinutes` below (target minus that balance)

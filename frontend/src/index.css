@@ -32,7 +32,7 @@
      pulled back from pure neon saturation. Red in particular is reserved for
      an actual under-target shortfall (see classifySummaryState), so it only
      ever fires as a real signal, not just "far from target either way". */
-  --state-under: #C99A46;
+  --state-under: #E8A93A;
   --state-target: #86BF52;
   --state-over: #E5453B;
 
@@ -924,7 +924,10 @@ body {
    echoing the block's own location/type color so the tooltip still reads as
    "about that block" even once it's floating well outside it. Hidden until
    JS has measured and placed it (see the component's useLayoutEffect) --
-   same two-step positioning as TimeField's popover. */
+   same two-step positioning as TimeField's popover. Shorter entrance than
+   the other popovers built on this same keyframe (0.05s vs their 0.14s) --
+   this one appears on a mere hover, not a click, so it needs to read as
+   instant rather than as a considered "opening" of something. */
 .session-tooltip {
   visibility: hidden;
   z-index: 50;
@@ -935,7 +938,7 @@ body {
   padding: 8px 10px;
   box-shadow: 0 12px 28px rgba(0, 0, 0, 0.55);
   pointer-events: none;
-  animation: correction-popover-in 0.14s ease-out;
+  animation: correction-popover-in 0.05s ease-out;
 }
 .session-tooltip-header {
   display: flex;
@@ -1598,23 +1601,33 @@ select:focus {
   height: auto;
   aspect-ratio: 1;
 }
-.overview-cell.level-1 { background: color-mix(in srgb, var(--accent) 28%, var(--surface-raised)); border-color: transparent; }
-.overview-cell.level-2 { background: color-mix(in srgb, var(--accent) 52%, var(--surface-raised)); border-color: transparent; }
-.overview-cell.level-3 { background: color-mix(in srgb, var(--accent) 76%, var(--surface-raised)); border-color: transparent; }
-.overview-cell.level-4 { background: var(--accent); border-color: transparent; }
-.overview-cell.level-5 { background: var(--state-over); border-color: transparent; }
+/* Hue carries the state (did that day hit its target or not), not just a
+   deeper shade of the same accent color -- see dayCellClass in
+   OverviewView. Same three colors as the day-total text, status lamp, and
+   week/weekday bars (state-under/state-target/state-over), so the meaning
+   is already familiar by the time it shows up here. cell-empty (no entries
+   that day) is left at the base .overview-cell look -- neutral, not a 4th
+   "state". */
+.overview-cell.cell-under { background: var(--state-under); border-color: transparent; }
+.overview-cell.cell-target { background: var(--state-target); border-color: transparent; }
+.overview-cell.cell-over { background: var(--state-over); border-color: transparent; }
 
 .overview-legend {
   display: flex;
   align-items: center;
-  gap: 4px;
+  flex-wrap: wrap;
+  gap: 5px;
   margin-top: 12px;
   font-size: 0.7rem;
   color: var(--text-dim);
 }
 .overview-legend .overview-cell {
-  width: 11px;
-  height: 11px;
+  width: 9px;
+  height: 9px;
+  margin-left: 8px;
+}
+.overview-legend .overview-cell:first-child {
+  margin-left: 0;
 }
 
 /* --- Overview: weekly-hours + by-weekday charts --- */
@@ -1913,17 +1926,29 @@ select:focus {
   flex: 1.4 1 0;
 }
 
-/* The main Settings panel is a plain stacked list of category cards --
-   after trying a drag-to-reorder grid and then a freeform drag canvas, both
+/* The main Settings panel is a fixed 2x2 grid of category cards -- after
+   trying a drag-to-reorder grid and then a freeform drag canvas, both
    proved less "intuitive" than just always showing every setting in the
-   same predictable place. One column keeps every card full-width, which
-   sidesteps the whole "cards of different heights leave gaps when sharing
-   a row" problem that a multi-column layout kept running into. */
+   same predictable place, and a single full-width column (tried in between)
+   wasted most of the panel's width on a page this wide.
+   Cards are paired by rough height rather than reading order (see the
+   `order` set per card in SettingsPanel: Work week + Data & backup are both
+   short, What counts + Display are both taller) with the grid's default
+   stretch alignment -- so a row's shorter card grows to match its taller
+   row-mate instead of leaving a gap under it before the next row starts,
+   the problem every earlier version of this panel kept running into. DOM
+   order stays the natural reading order regardless (`order` is purely
+   visual), so tab order is unaffected. */
 .settings-panel-list {
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
   gap: 16px;
   margin-top: 16px;
+}
+@media (max-width: 760px) {
+  .settings-panel-list {
+    grid-template-columns: 1fr;
+  }
 }
 
 .settings-section {

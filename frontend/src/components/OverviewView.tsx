@@ -5,7 +5,13 @@ import { buildCalendarYearWeeks } from "../utils/calendar";
 import { formatDuration, formatSignedDuration, getMonday, toISODate } from "../utils/dateUtils";
 import { ENTRY_TYPE_LABEL } from "../utils/timelineLayout";
 import { WEEKDAY_LABEL, workdayCount, workdayOffsets, type Weekday } from "../utils/workweek";
-import { classifySummaryState, classifyWeekdayAverageState, dayTargetMinutes, meterMaxMinutes } from "../utils/weekSummary";
+import {
+  classifyDayCellState,
+  classifySummaryState,
+  classifyWeekdayAverageState,
+  dayTargetMinutes,
+  meterMaxMinutes,
+} from "../utils/weekSummary";
 import type { CorrectionsByWeek } from "../utils/corrections";
 import type { EntryType } from "../types/WorkSession";
 import { SettingsPanel } from "./SettingsPanel";
@@ -15,17 +21,37 @@ import { SettingsSidebar } from "./SettingsSidebar";
 // happen to sort) so a type's line/legend position stays put week to week.
 const CHART_ENTRY_TYPES: EntryType[] = ["Working", "Sick", "OvertimeCompensation", "Appointment", "Lunch"];
 
-// Levels 1-4 scale linearly from 0h up to the daily target (100%); level 5 is
-// reserved for days that beat the target by a full hour or more, so "hit your
-// goal" and "blew past it" read as visibly different intensities.
-function intensityClass(minutes: number, dayTarget: number): string {
-  if (minutes <= 0) return "level-0";
-  if (minutes >= dayTarget + 60) return "level-5";
-  const ratio = minutes / dayTarget;
-  if (ratio <= 0.25) return "level-1";
-  if (ratio <= 0.5) return "level-2";
-  if (ratio <= 0.75) return "level-3";
-  return "level-4";
+// Colors each day by whether it met, missed, or blew past that day's target
+// -- a distinct hue per state (see classifyDayCellState) instead of a
+// single-hue intensity ramp, which made every worked day look like a shade
+// of the same color and left "fell short" and "hit the goal" for only
+// saturation to tell apart.
+function dayCellClass(minutes: number, dayTarget: number): string {
+  if (minutes <= 0) return "cell-empty";
+  return `cell-${classifyDayCellState(minutes, dayTarget)}`;
+}
+
+// A day at 200%+ of its target mixes in this much black; ratios below scale
+// down linearly from there, so 0% over (exactly on target) is the plain
+// base green and anything past the cap just holds at the darkest shade
+// instead of drifting toward unreadable black.
+const OVER_TARGET_DARKEN_CAP_RATIO = 1;
+const OVER_TARGET_MAX_DARKEN_PERCENT = 55;
+
+// Every under-target day is a flat color (red or amber) -- the point there
+// is an immediate, binary "this needs attention", not a gradient. A day
+// past its target has no such urgency, so it gets to keep the "how much"
+// story a flat green would otherwise lose: the further over, the darker
+// (richer) the green, layered on top of the same .cell-target base color
+// via color-mix rather than a second hardcoded color.
+function dayCellStyle(minutes: number, dayTarget: number, weekIndex: number): CSSProperties {
+  const style: CSSProperties = { "--week-index": weekIndex } as CSSProperties;
+  if (dayTarget > 0 && minutes > dayTarget) {
+    const overRatio = (minutes - dayTarget) / dayTarget;
+    const darkenPercent = Math.min(overRatio / OVER_TARGET_DARKEN_CAP_RATIO, 1) * OVER_TARGET_MAX_DARKEN_PERCENT;
+    style.backgroundColor = `color-mix(in srgb, var(--state-target) ${100 - darkenPercent}%, black ${darkenPercent}%)`;
+  }
+  return style;
 }
 
 const RECENT_WEEK_COUNT = 13;
@@ -297,8 +323,8 @@ export function OverviewView({ onClearAllData, onExportData, onImportData, corre
                   return (
                     <div
                       key={iso}
-                      className={`overview-cell ${intensityClass(minutes, dayTarget)}`}
-                      style={{ "--week-index": weekIndex } as CSSProperties}
+                      className={`overview-cell ${dayCellClass(minutes, dayTarget)}`}
+                      style={dayCellStyle(minutes, dayTarget, weekIndex)}
                       title={tooltip}
                     />
                   );
@@ -309,14 +335,14 @@ export function OverviewView({ onClearAllData, onExportData, onImportData, corre
         </div>
 
         <div className="overview-legend">
-          <span>Less</span>
-          <span className="overview-cell level-0" />
-          <span className="overview-cell level-1" />
-          <span className="overview-cell level-2" />
-          <span className="overview-cell level-3" />
-          <span className="overview-cell level-4" />
-          <span className="overview-cell level-5" />
-          <span>More</span>
+          <span className="overview-cell cell-empty" />
+          <span>No data</span>
+          <span className="overview-cell cell-under" />
+          <span>Off pace</span>
+          <span className="overview-cell cell-target" />
+          <span>On target</span>
+          <span className="overview-cell cell-over" />
+          <span>Way off</span>
         </div>
 
         <div className="overview-secondary-charts">

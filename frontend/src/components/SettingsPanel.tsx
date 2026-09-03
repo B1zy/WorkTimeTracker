@@ -132,7 +132,7 @@ export function SettingsPanel({ onClearAllData, onExportData, onImportData }: Se
 
   const cards: ReactNode = (
     <>
-      <section className="settings-section">
+      <section className="settings-section" style={{ order: 1 }}>
         <h3 className="settings-section-title">Work week</h3>
         <div className="settings-row-grid">
           <div className="settings-row">
@@ -178,7 +178,7 @@ export function SettingsPanel({ onClearAllData, onExportData, onImportData }: Se
         </div>
       </section>
 
-      <section className="settings-section">
+      <section className="settings-section" style={{ order: 3 }}>
         <h3 className="settings-section-title">What counts as worked time</h3>
         <div className="settings-row-grid">
           {ENTRY_TYPES.map((type) => (
@@ -204,7 +204,7 @@ export function SettingsPanel({ onClearAllData, onExportData, onImportData }: Se
         </div>
       </section>
 
-      <section className="settings-section">
+      <section className="settings-section" style={{ order: 4 }}>
         <h3 className="settings-section-title">Display</h3>
         <div className="settings-row-grid">
           <div className="settings-row">
@@ -291,7 +291,7 @@ export function SettingsPanel({ onClearAllData, onExportData, onImportData }: Se
         </div>
       </section>
 
-      <section className="settings-section">
+      <section className="settings-section" style={{ order: 2 }}>
         <h3 className="settings-section-title">Data &amp; backup</h3>
         <div className="settings-row-grid">
           <div className="settings-row">
