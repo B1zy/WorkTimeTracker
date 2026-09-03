@@ -9,6 +9,7 @@ interface WeekRowsProps {
   onAddClick: (dateIso: string, dateObj: Date, startTime?: string | null, endTime?: string | null) => void;
   onSessionClick: (session: WorkSession) => void;
   onSessionMove: (session: WorkSession, newStart: string, newEnd: string) => Promise<boolean>;
+  onAddBreakClick: (dateIso: string) => void;
   onRemoveAllClick: (dateIso: string) => void;
   onCopyClick: (dateIso: string) => void;
   onPasteClick: (dateIso: string) => void;

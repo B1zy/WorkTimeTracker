@@ -1,10 +1,11 @@
 import { useMemo, useState } from "react";
 import { createSession, deleteSession, getAllSessions, updateSession } from "./api/workSessions";
 import { backupFilename, buildBackup, downloadJson, parseBackup } from "./utils/backup";
-import { addDays, formatDayHeaderLabel, formatWeekRangeLabel, getMonday, timeRangesOverlap, timeStringToMinutes, toISODate } from "./utils/dateUtils";
+import { addDays, formatDayHeaderLabel, formatDuration, formatWeekRangeLabel, getMonday, timeRangesOverlap, timeStringToMinutes, toISODate } from "./utils/dateUtils";
 import { ENTRY_TYPE_LABEL, minsToTimeStr, snapToNearestFreeSlot } from "./utils/timelineLayout";
 import { weekDates } from "./utils/workweek";
 import { computeWeekSummary } from "./utils/weekSummary";
+import { computeDayBreakCompliance, planBreakInsertion } from "./utils/breakCompliance";
 import { useWeekData } from "./hooks/useWeekData";
 import { useCarryoverMinutes } from "./hooks/useCarryover";
 import { useSessionDialog } from "./hooks/useSessionDialog";
@@ -163,6 +164,49 @@ function App() {
         return false;
       }
     });
+  }
+
+  // Clicking the timeline's break-compliance tag (see TimelineTrack) adds
+  // exactly the missing break itself, rather than sending the user to the
+  // Add Session dialog to work out the numbers by hand -- created straight
+  // away, no dialog, same as a pasted day's sessions. Making room for it can
+  // require trimming the session(s) it lands on top of too (see
+  // planBreakInsertion) -- those go through the API one at a time, same
+  // sequential-writes reason as deleteSessionsSequentially (the backend is a
+  // single-writer SQLite store), though trims can't collide with each other
+  // regardless of order.
+  async function handleAddBreak(dateIso: string) {
+    const daySessions = sessionsByDate[dateIso] ?? [];
+    const compliance = computeDayBreakCompliance(daySessions);
+    const deficitMinutes = compliance.requiredMinutes - compliance.breakMinutes;
+
+    const plan = planBreakInsertion(daySessions, deficitMinutes);
+    if (!plan) {
+      setMutationError(`No room left today for a ${formatDuration(deficitMinutes)} break.`);
+      return;
+    }
+
+    try {
+      setMutationError(null);
+      for (const session of plan.updates) {
+        await updateSession(session.id, session);
+      }
+      if (plan.create) {
+        await createSession(plan.create);
+      }
+      await createSession({
+        name: "",
+        description: "",
+        location: "InOffice",
+        entryType: "Lunch",
+        date: dateIso,
+        start: minsToTimeStr(plan.breakSlot.start),
+        end: minsToTimeStr(plan.breakSlot.end),
+      });
+      await refetch();
+    } catch (err) {
+      setMutationError(errorMessage(err));
+    }
   }
 
   function handleSessionClick(session: WorkSession) {
@@ -376,6 +420,7 @@ function App() {
               onAddClick={handleAddClick}
               onSessionClick={handleSessionClick}
               onSessionMove={handleSessionMove}
+              onAddBreakClick={handleAddBreak}
               onRemoveAllClick={handleRemoveAllClick}
               onCopyClick={handleCopyDay}
               onPasteClick={handlePasteDay}

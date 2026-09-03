@@ -1067,10 +1067,19 @@ body {
 
 /* Only rendered when a day's Working hours cross an Art. 15 ArG break
    threshold without enough logged break time -- a quiet flag, not a status
-   shown on every compliant day. A plain text tag pinned to the right edge of
-   the day's last Working block (inside .timeline-track, which has no
-   overflow:hidden to clip against) so it reads as attached to that bar
-   rather than floating in whatever empty track space happens to be free. */
+   shown on every compliant day. A real <button> (see TimelineTrack's
+   onAddBreak) pinned to the right edge of the day's last Working block
+   (inside .timeline-track, which has no overflow:hidden to clip against) so
+   it reads as attached to that bar rather than floating in whatever empty
+   track space happens to be free -- clicking it inserts exactly the missing
+   break (see suggestBreakSlot) instead of making you go add one by hand.
+   The block it's pinned to is dragged via direct DOM mutation for
+   performance (see useDragToMove), not a React re-render, so this tag has
+   no way to follow it live mid-drag -- it only catches up once the drop
+   commits and `sessions` actually changes. transition: left smooths that
+   catch-up into a glide instead of a hard teleport, which is what makes it
+   read as attached to the bar rather than a separately-updating label that
+   happens to sit near it. */
 .timeline-break-tag {
   position: absolute;
   top: 5px;
@@ -1089,7 +1098,12 @@ body {
   background: var(--surface-raised);
   color: var(--state-over);
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.5);
-  cursor: default;
+  cursor: pointer;
+  transition: left 0.2s ease, background 0.1s ease, color 0.1s ease;
+}
+.timeline-break-tag:hover {
+  background: var(--state-over);
+  color: var(--text-on-accent);
 }
 
 .day-row-actions {

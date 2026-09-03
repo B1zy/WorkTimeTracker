@@ -20,6 +20,7 @@ interface DayRowProps {
   onAddClick: (dateIso: string, dateObj: Date, startTime?: string | null, endTime?: string | null) => void;
   onSessionClick: (session: WorkSession) => void;
   onSessionMove: (session: WorkSession, newStart: string, newEnd: string) => Promise<boolean>;
+  onAddBreakClick: (dateIso: string) => void;
   onRemoveAllClick: (dateIso: string) => void;
   onCopyClick: (dateIso: string) => void;
   onPasteClick: (dateIso: string) => void;
@@ -35,6 +36,7 @@ export function DayRow({
   onAddClick,
   onSessionClick,
   onSessionMove,
+  onAddBreakClick,
   onRemoveAllClick,
   onCopyClick,
   onPasteClick,
@@ -94,6 +96,7 @@ export function DayRow({
           onSessionClick={onSessionClick}
           onTrackClick={(startTime, endTime) => onAddClick(iso, date, startTime, endTime)}
           onSessionMove={onSessionMove}
+          onAddBreak={() => onAddBreakClick(iso)}
         />
       </div>
 

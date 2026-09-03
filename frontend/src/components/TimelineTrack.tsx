@@ -18,6 +18,7 @@ interface TimelineTrackProps {
   onSessionClick: (session: WorkSession) => void;
   onTrackClick: (startTime: string, endTime: string | null) => void;
   onSessionMove: (session: WorkSession, newStart: string, newEnd: string) => Promise<boolean>;
+  onAddBreak: () => void;
 }
 
 export function TimelineTrack({
@@ -29,6 +30,7 @@ export function TimelineTrack({
   onSessionClick,
   onTrackClick,
   onSessionMove,
+  onAddBreak,
 }: TimelineTrackProps) {
   const trackRef = useRef<HTMLDivElement>(null);
   const ghostRef = useRef<HTMLDivElement>(null);
@@ -104,17 +106,19 @@ export function TimelineTrack({
         />
       ))}
       {showBreakTag && (
-        <div
+        <button
+          type="button"
           className="timeline-break-tag"
           style={{ left: `${lastWorkingEndPercent}%` }}
+          onClick={onAddBreak}
           title={`Swiss labour law (Art. 15 ArG): ${formatDuration(
             breakCompliance.workedMinutes
           )} worked requires at least ${formatDuration(breakCompliance.requiredMinutes)} break -- only ${formatDuration(
             breakCompliance.breakMinutes
-          )} taken.`}
+          )} taken. Click to add a ${formatDuration(breakDeficitMinutes)} break.`}
         >
           Needs {formatDuration(breakDeficitMinutes)} break
-        </div>
+        </button>
       )}
     </div>
   );
