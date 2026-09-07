@@ -25,6 +25,19 @@ builder.Services.AddHttpClient<IWeatherService, WeatherService>((sp, client) =>
     var options = sp.GetRequiredService<IOptions<WeatherApiOptions>>().Value;
     client.BaseAddress = new Uri(options.BaseUrl);
 });
+
+// Historical weather only (see WeatherService) -- weatherapi.com's own
+// history.json needs a paid plan, so past days come from Open-Meteo
+// instead, which needs no API key at all for non-commercial use. A second,
+// named client rather than a second typed one: WeatherService already has
+// a typed HttpClient bound to weatherapi.com above, and a class can only
+// have one of those, so this one's resolved via IHttpClientFactory.
+builder.Services.Configure<OpenMeteoOptions>(builder.Configuration.GetSection("OpenMeteo"));
+builder.Services.AddHttpClient("OpenMeteo", (sp, client) =>
+{
+    var options = sp.GetRequiredService<IOptions<OpenMeteoOptions>>().Value;
+    client.BaseAddress = new Uri(options.BaseUrl);
+});
 // Solo local app served from a plain static file server (Live Server, `npx serve`, etc.),
 // so the frontend's port isn't fixed. Allowing any origin is fine here since there's no
 // auth/credentials involved -- but the method/header list is still narrowed to what the

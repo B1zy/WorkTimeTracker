@@ -195,6 +195,45 @@ export function OverviewView({ onClearAllData, onExportData, onImportData, corre
   );
   const weekTargetLinePercent = Math.min((weekTarget / weekMax) * 100, 100);
 
+  // Per-month totals across the whole year -- same underlying day data as
+  // the heatmap/weekly chart above, just bucketed by calendar month instead
+  // of week. Each month's own target scales with how many active workdays
+  // actually fall in it (28-31 days, weekends/non-workdays excluded), so a
+  // short February isn't held to the same bar as a full March -- shown as a
+  // tick mark on each bar rather than one shared line, since (unlike the
+  // weekly chart, where every week shares the same target) that target
+  // moves bar to bar.
+  const monthBars = useMemo(() => {
+    const totals = new Array(12).fill(0) as number[];
+    const workdayCounts = new Array(12).fill(0) as number[];
+    weeks.forEach((week) => {
+      week.forEach((day) => {
+        if (day.getFullYear() !== year) return;
+        const m = day.getMonth();
+        totals[m] += minutesByDate[toISODate(day)] ?? 0;
+        workdayCounts[m]++;
+      });
+    });
+
+    const targets = workdayCounts.map((count) => count * dayTarget);
+    const maxValue = Math.max(1, ...totals.map((m) => Math.abs(m)), ...targets);
+
+    return totals.map((minutes, i) => {
+      const monthDate = new Date(year, i, 1);
+      const tracked = workdayCounts[i] > 0 && minutes !== 0;
+      return {
+        key: i,
+        label: monthDate.toLocaleDateString(undefined, { month: "short" }),
+        heightPercent: Math.min((Math.abs(minutes) / maxValue) * 100, 100),
+        targetPercent: Math.min((targets[i] / maxValue) * 100, 100),
+        state: tracked ? classifySummaryState(minutes, targets[i]) : null,
+        tooltip: `${monthDate.toLocaleDateString(undefined, { month: "long" })} — ${
+          minutes !== 0 ? formatDuration(minutes) : "No entries"
+        }${workdayCounts[i] > 0 ? ` / ${formatDuration(targets[i])} target` : ""}`,
+      };
+    });
+  }, [weeks, year, minutesByDate, dayTarget]);
+
   // By-weekday averages: for each active weekday, the mean of its tracked
   // days across the whole year -- answers "which days do I actually work
   // more/less", which the calendar heatmap can't show at a glance.
@@ -343,6 +382,22 @@ export function OverviewView({ onClearAllData, onExportData, onImportData, corre
           <span>On target</span>
           <span className="overview-cell cell-over" />
           <span>Way off</span>
+        </div>
+
+        <h3 className="overview-section-title overview-section-title-spaced">Monthly hours</h3>
+        <div className="overview-month-chart">
+          {monthBars.map((bar) => (
+            <div key={bar.key} className="overview-month-bar-col">
+              <div className="overview-bar overview-month-bar" title={bar.tooltip}>
+                <div className="overview-month-bar-target-tick" style={{ bottom: `${bar.targetPercent}%` }} />
+                <div
+                  className={`overview-bar-fill${bar.state ? ` state-${bar.state}` : ""}`}
+                  style={{ height: `${bar.heightPercent}%` }}
+                />
+              </div>
+              <span className="overview-month-bar-label">{bar.label}</span>
+            </div>
+          ))}
         </div>
 
         <div className="overview-secondary-charts">

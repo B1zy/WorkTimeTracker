@@ -25,21 +25,26 @@ export interface UseCarryoverResult {
 // deficit rather than being silently skipped.
 //
 // Mirrors OverviewView's own carryover stat, but relative to whatever week is
-// currently being viewed (`monday`) rather than to today -- capped at today's
-// Monday, though: viewing a *future* week must not count today's still-
-// in-progress week (or any other not-yet-complete week between now and then)
-// as a shortfall just because it's technically "before" the viewed week.
+// currently being viewed (`monday`) rather than to today. The walk itself
+// always runs up to `monday` (never capped at today) -- a week fetched here
+// only *contributes* to the balance if it's today's week or earlier
+// (`weekIso <= todayMondayIso`); anything still ahead of today is skipped
+// rather than treated as a missed week, since there's nothing to have logged
+// for it yet. That distinction is what lets a week further out than "next
+// week" preview correctly -- e.g. two weeks from now, this week (assuming
+// it's already fully logged) counts for real, while the not-yet-started week
+// in between contributes nothing, rather than reading as a full deficit just
+// because it's technically "before" whatever week is being viewed.
 export function useCarryoverMinutes(monday: Date, corrections: CorrectionsByWeek): UseCarryoverResult {
   const { settings } = useSettings();
-  const todayMonday = getMonday(new Date());
-  const cutoffMonday = monday < todayMonday ? monday : todayMonday;
-  const cutoffMondayIso = toISODate(cutoffMonday);
+  const todayMondayIso = toISODate(getMonday(new Date()));
+  const mondayIso = toISODate(monday);
   const [sessions, setSessions] = useState<WorkSession[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const refetch = useCallback(async () => {
-    const endIso = toISODate(addDays(new Date(`${cutoffMondayIso}T00:00:00`), -1));
+    const endIso = toISODate(addDays(new Date(`${mondayIso}T00:00:00`), -1));
     setLoading(true);
     try {
       const fetched = await getSessions("1970-01-01", endIso);
@@ -50,7 +55,7 @@ export function useCarryoverMinutes(monday: Date, corrections: CorrectionsByWeek
     } finally {
       setLoading(false);
     }
-  }, [cutoffMondayIso]);
+  }, [mondayIso]);
 
   useEffect(() => {
     refetch();
@@ -71,25 +76,25 @@ export function useCarryoverMinutes(monday: Date, corrections: CorrectionsByWeek
 
     // The first week with any activity at all -- a logged session or a
     // manual correction -- marks where tracking actually starts; everything
-    // before it is out of scope, everything from it up to the cutoff (even a
-    // week with nothing in totalsByWeek) is a real week to walk.
-    const activeWeekIsos = [...totalsByWeek.keys(), ...Object.keys(corrections)].filter(
-      (iso) => iso < cutoffMondayIso
-    );
+    // before it is out of scope, everything from it up to the viewed week
+    // (even a week with nothing in totalsByWeek) is a real week to walk.
+    const activeWeekIsos = [...totalsByWeek.keys(), ...Object.keys(corrections)].filter((iso) => iso < mondayIso);
     if (activeWeekIsos.length === 0) return 0;
     const firstWeekIso = activeWeekIsos.reduce((min, iso) => (iso < min ? iso : min));
 
     let balance = 0;
     let cursor = new Date(`${firstWeekIso}T00:00:00`);
-    while (toISODate(cursor) < cutoffMondayIso) {
+    while (toISODate(cursor) < mondayIso) {
       const weekIso = toISODate(cursor);
-      const weekTotal = totalsByWeek.get(weekIso) ?? 0;
-      const correction = corrections[weekIso] ?? 0;
-      balance += weekTotal + correction - settings.weeklyTargetMinutes;
+      if (weekIso <= todayMondayIso) {
+        const weekTotal = totalsByWeek.get(weekIso) ?? 0;
+        const correction = corrections[weekIso] ?? 0;
+        balance += weekTotal + correction - settings.weeklyTargetMinutes;
+      }
       cursor = addDays(cursor, 7);
     }
     return balance;
-  }, [sessions, settings.workdays, settings.entryTypeCounting, settings.weeklyTargetMinutes, corrections, cutoffMondayIso]);
+  }, [sessions, settings.workdays, settings.entryTypeCounting, settings.weeklyTargetMinutes, corrections, mondayIso, todayMondayIso]);
 
   return { carryoverMinutes, loading, error, refetch };
 }

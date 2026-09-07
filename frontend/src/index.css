@@ -1693,6 +1693,53 @@ select:focus {
 .overview-bar-fill.state-under { background: var(--state-under); }
 .overview-bar-fill.state-over { background: var(--state-over); }
 
+/* Monthly hours: its own full-width section (like the weekly chart above
+   it), not squeezed into the narrower secondary-chart row -- only 12 bars
+   (vs. the weekly chart's 52), so each gets its own labelled column instead
+   of relying purely on a hover tooltip. Columns are capped at a fixed width
+   (rather than flex-growing to fill whatever's left of the row, which made
+   them balloon into wide, disproportionate blocks) and centered as a group,
+   so the chart reads as one deliberately-sized row regardless of how much
+   spare width the page has. Reuses .overview-bar/.overview-bar-fill for the
+   same bar look, but each bar gets its own target tick (see
+   .overview-month-bar-target-tick) rather than one shared
+   .overview-target-line, since a month's target -- workdays in that month ×
+   the daily target -- varies bar to bar instead of staying fixed the way a
+   week's does. */
+.overview-month-chart {
+  display: flex;
+  justify-content: center;
+  gap: 16px;
+}
+.overview-month-bar-col {
+  flex: 0 1 40px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+.overview-month-bar {
+  position: relative;
+  width: 100%;
+  height: 90px;
+  border-bottom: 1px solid var(--border);
+}
+.overview-month-bar-target-tick {
+  position: absolute;
+  left: -2px;
+  right: -2px;
+  height: 1px;
+  background: var(--text-dim);
+  z-index: 1;
+}
+.overview-month-bar-label {
+  font-family: var(--font-display);
+  font-size: 0.6rem;
+  color: var(--text-dim);
+  letter-spacing: 0.02em;
+}
+
 /* The weekday chart and the recent-weeks by-type chart sit side by side --
    there was empty space to the right of the (fixed-width) weekday chart, so
    the type chart fills it rather than leaving it blank. Wraps to stacked on

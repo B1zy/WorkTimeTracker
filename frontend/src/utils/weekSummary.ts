@@ -41,6 +41,12 @@ export function dayTargetLabel(weekTargetMinutes: number, workdayCount: number):
 // day) that's *over* target by 30% still gets the (amber) "under" tier,
 // matching the original app's naming.
 function classifyByDeviation(actualMinutes: number, targetMinutes: number, minorThreshold: number, majorThreshold: number): SummaryState {
+  // A target of zero or less (e.g. a week whose required minutes already
+  // dropped to/below zero because banked carryover covers it entirely) has
+  // nothing to measure a percentage deviation against -- any real total
+  // already clears it, so it reads as flat "target" rather than dividing by
+  // zero/a negative number.
+  if (targetMinutes <= 0) return "target";
   const diff = actualMinutes - targetMinutes;
   const deviation = Math.abs(diff) / targetMinutes;
   if (deviation > majorThreshold) return diff < 0 ? "over" : "under";
@@ -83,12 +89,13 @@ export function classifyDayCellState(actualMinutes: number, targetMinutes: numbe
 
 // `carryoverMinutes` is the running flex-time balance banked in from every
 // prior week (positive = worked ahead, negative = fell behind) -- see
-// entryTypeCounting.ts. `requiredMinutes` below (target minus that balance)
-// is exposed only for the "worked / required" tooltip and the gauge's
-// credit/debt segment -- it must NOT feed the label or state, or the badge
-// stops answering "how did *this* week go" and starts mixing in every prior
-// week's history, so a week that's dead on its own target shows some
-// unrelated multi-week balance instead of its own ~0.
+// entryTypeCounting.ts. `requiredMinutes` (target minus that balance) is what
+// this week actually needed to hit, banked time included -- the label/state
+// are judged against *that*, not the plain target, so a week that's short of
+// its raw target but covered by carryover reads as on-target/over rather
+// than under. (An earlier version judged the label against the plain target
+// only, deliberately excluding carryover -- reversed on request: the whole
+// point of banking flex time is that it should visibly cover a lighter week.)
 export function computeWeekSummary(
   totalMinutes: number,
   correctionMinutes: number,
@@ -97,8 +104,8 @@ export function computeWeekSummary(
 ): WeekSummary {
   const adjusted = totalMinutes + correctionMinutes;
   const required = weekTargetMinutes - carryoverMinutes;
-  const diff = adjusted - weekTargetMinutes;
-  const state = classifySummaryState(adjusted, weekTargetMinutes);
+  const diff = adjusted - required;
+  const state = classifySummaryState(adjusted, required);
   const label = Math.abs(diff) < 3 && state === "target" ? "On Target" : `${formatDuration(Math.abs(diff))} ${diff < 0 ? "Under" : "Over"}`;
 
   return {
