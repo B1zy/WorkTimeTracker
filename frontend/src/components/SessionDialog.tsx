@@ -5,7 +5,7 @@ import { formatDayHeaderLabel, timeStringToMinutes } from "../utils/dateUtils";
 import { ENTRY_TYPE_LABEL, minsToTimeStr } from "../utils/timelineLayout";
 import { TimeField } from "./TimeField";
 
-const ENTRY_TYPES: EntryType[] = ["Working", "Sick", "OvertimeCompensation", "Appointment", "Lunch"];
+const ENTRY_TYPES: EntryType[] = ["Working", "Sick", "OvertimeCompensation", "Appointment", "Lunch", "Vacation"];
 
 interface SessionDialogProps {
   state: SessionDialogState;

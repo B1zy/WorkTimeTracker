@@ -21,6 +21,7 @@ export const DEFAULT_ENTRY_TYPE_COUNTING: EntryTypeCounting = {
   OvertimeCompensation: "subtract",
   Appointment: "count",
   Lunch: "ignore",
+  Vacation: "count",
 };
 
 export const COUNTING_MODES: CountingMode[] = ["count", "ignore", "subtract"];

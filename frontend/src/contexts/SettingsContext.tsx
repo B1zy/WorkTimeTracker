@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
-import { applyColorOverrides, applyMotionPreference, loadSettings, saveSettings, type AppSettings } from "../utils/settings";
+import { applyColorOverrides, applyMotionPreference, applyTheme, loadSettings, saveSettings, type AppSettings } from "../utils/settings";
 
 interface SettingsContextValue {
   settings: AppSettings;
@@ -14,6 +14,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     applyColorOverrides(settings.colors);
     applyMotionPreference(settings.animationsEnabled);
+    applyTheme(settings.theme);
     saveSettings(settings);
   }, [settings]);
 

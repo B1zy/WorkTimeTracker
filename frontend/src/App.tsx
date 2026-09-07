@@ -35,6 +35,29 @@ async function deleteSessionsSequentially(ids: number[]): Promise<void> {
   }
 }
 
+// Recreates a snapshot of sessions (stripped of their old ids) -- the Undo
+// side of a destructive action. Sequential for the same single-writer-SQLite
+// reason as deleteSessionsSequentially. Returns the newly created sessions
+// (with their fresh ids) so a caller can itself be undone later (see
+// handlePasteDay, which deletes them again on its own Undo).
+async function restoreSessions(sessions: WorkSession[], dateIso?: string): Promise<WorkSession[]> {
+  const created: WorkSession[] = [];
+  for (const session of sessions) {
+    created.push(
+      await createSession({
+        name: session.name,
+        description: session.description,
+        location: session.location,
+        entryType: session.entryType,
+        date: dateIso ?? session.date,
+        start: session.start,
+        end: session.end,
+      })
+    );
+  }
+  return created;
+}
+
 function App() {
   const [currentMonday, setCurrentMonday] = useState(() => getMonday(new Date()));
   const [mutationError, setMutationError] = useState<string | null>(null);
@@ -50,7 +73,7 @@ function App() {
   const { corrections, getCorrection, setCorrection, replaceAll: replaceCorrections } = useWeekCorrections();
   const { carryoverMinutes, refetch: refetchCarryover } = useCarryoverMinutes(currentMonday, corrections);
   const recording = useLiveRecording();
-  const { message: toastMessage, showToast } = useToast();
+  const { message: toastMessage, action: toastAction, showToast } = useToast();
 
   const mondayIso = useMemo(() => toISODate(currentMonday), [currentMonday]);
   const correctionMinutes = getCorrection(mondayIso);
@@ -237,6 +260,17 @@ function App() {
         try {
           await deleteSession(session.id);
           await refetch();
+          showToast(`Deleted ${session.name || ENTRY_TYPE_LABEL[session.entryType]}`, {
+            label: "Undo",
+            onClick: async () => {
+              try {
+                await restoreSessions([session]);
+                await refetch();
+              } catch (err) {
+                setMutationError(errorMessage(err));
+              }
+            },
+          });
           return true;
         } catch (err) {
           setMutationError(errorMessage(err));
@@ -294,6 +328,18 @@ function App() {
       setMutationError(null);
       await deleteSessionsSequentially(daySessions.map((s) => s.id));
       await refetch();
+      const dateObj = new Date(`${dateIso}T00:00:00`);
+      showToast(`Cleared ${formatDayHeaderLabel(dateObj)}`, {
+        label: "Undo",
+        onClick: async () => {
+          try {
+            await restoreSessions(daySessions, dateIso);
+            await refetch();
+          } catch (err) {
+            setMutationError(errorMessage(err));
+          }
+        },
+      });
     } catch (err) {
       setMutationError(errorMessage(err));
     }
@@ -308,7 +354,9 @@ function App() {
   // Replaces the target day's entries outright: existing sessions are
   // deleted first, then the copied ones are recreated on the new date with
   // their original times/type/name intact. Sequential creates for the same
-  // SQLite-writer reason as deleteSessionsSequentially.
+  // SQLite-writer reason as deleteSessionsSequentially. Fires immediately,
+  // no "are you sure" step -- if it overwrote anything, the Undo toast below
+  // is the safety net instead.
   async function handlePasteDay(dateIso: string) {
     if (!dayClipboard) return;
 
@@ -316,19 +364,27 @@ function App() {
       setMutationError(null);
       const existing = sessionsByDate[dateIso] ?? [];
       await deleteSessionsSequentially(existing.map((s) => s.id));
-
-      for (const session of dayClipboard) {
-        await createSession({
-          name: session.name,
-          description: session.description,
-          location: session.location,
-          entryType: session.entryType,
-          date: dateIso,
-          start: session.start,
-          end: session.end,
-        });
-      }
+      const created = await restoreSessions(dayClipboard, dateIso);
       await refetch();
+
+      if (existing.length > 0) {
+        const dateObj = new Date(`${dateIso}T00:00:00`);
+        showToast(
+          `Pasted into ${formatDayHeaderLabel(dateObj)} (replaced ${existing.length} ${existing.length === 1 ? "entry" : "entries"})`,
+          {
+            label: "Undo",
+            onClick: async () => {
+              try {
+                await deleteSessionsSequentially(created.map((s) => s.id));
+                await restoreSessions(existing, dateIso);
+                await refetch();
+              } catch (err) {
+                setMutationError(errorMessage(err));
+              }
+            },
+          }
+        );
+      }
     } catch (err) {
       setMutationError(errorMessage(err));
     }
@@ -340,6 +396,19 @@ function App() {
       const all = await getAllSessions();
       await deleteSessionsSequentially(all.map((s) => s.id));
       await Promise.all([refetch(), refetchCarryover()]);
+      if (all.length > 0) {
+        showToast(`Cleared all data (${all.length} ${all.length === 1 ? "entry" : "entries"})`, {
+          label: "Undo",
+          onClick: async () => {
+            try {
+              await restoreSessions(all);
+              await Promise.all([refetch(), refetchCarryover()]);
+            } catch (err) {
+              setMutationError(errorMessage(err));
+            }
+          },
+        });
+      }
     } catch (err) {
       setMutationError(errorMessage(err));
     }
@@ -437,7 +506,7 @@ function App() {
         )}
       </div>
 
-      <Toast message={toastMessage} />
+      <Toast message={toastMessage} action={toastAction} />
       <SessionDialog state={dialog.state} onClose={dialog.close} />
     </>
   );

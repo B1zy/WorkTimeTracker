@@ -2,7 +2,8 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { getSessions } from "../api/workSessions";
 import { countedMinutes } from "../utils/entryTypeCounting";
 import { addDays, getMonday, toISODate } from "../utils/dateUtils";
-import type { Weekday } from "../utils/workweek";
+import { workdayCount, type Weekday } from "../utils/workweek";
+import { dayTargetMinutes } from "../utils/weekSummary";
 import { useSettings } from "../contexts/SettingsContext";
 import type { WorkSession } from "../types/WorkSession";
 import type { CorrectionsByWeek } from "../utils/corrections";
@@ -82,6 +83,12 @@ export function useCarryoverMinutes(monday: Date, corrections: CorrectionsByWeek
     if (activeWeekIsos.length === 0) return 0;
     const firstWeekIso = activeWeekIsos.reduce((min, iso) => (iso < min ? iso : min));
 
+    // A holiday on an active workday isn't a missed target -- there was
+    // nothing to log -- so it shrinks that week's effective target by one
+    // day's worth rather than letting the empty day register as a deficit.
+    const holidaySet = new Set(settings.holidays);
+    const dayTarget = dayTargetMinutes(settings.weeklyTargetMinutes, workdayCount(settings.workdays));
+
     let balance = 0;
     let cursor = new Date(`${firstWeekIso}T00:00:00`);
     while (toISODate(cursor) < mondayIso) {
@@ -89,12 +96,28 @@ export function useCarryoverMinutes(monday: Date, corrections: CorrectionsByWeek
       if (weekIso <= todayMondayIso) {
         const weekTotal = totalsByWeek.get(weekIso) ?? 0;
         const correction = corrections[weekIso] ?? 0;
-        balance += weekTotal + correction - settings.weeklyTargetMinutes;
+        let holidayCount = 0;
+        for (let i = 0; i < 7; i++) {
+          const day = addDays(cursor, i);
+          if (!activeWeekdays.has(day.getDay() as Weekday)) continue;
+          if (holidaySet.has(toISODate(day))) holidayCount++;
+        }
+        const effectiveTarget = settings.weeklyTargetMinutes - holidayCount * dayTarget;
+        balance += weekTotal + correction - effectiveTarget;
       }
       cursor = addDays(cursor, 7);
     }
     return balance;
-  }, [sessions, settings.workdays, settings.entryTypeCounting, settings.weeklyTargetMinutes, corrections, mondayIso, todayMondayIso]);
+  }, [
+    sessions,
+    settings.workdays,
+    settings.entryTypeCounting,
+    settings.weeklyTargetMinutes,
+    settings.holidays,
+    corrections,
+    mondayIso,
+    todayMondayIso,
+  ]);
 
   return { carryoverMinutes, loading, error, refetch };
 }

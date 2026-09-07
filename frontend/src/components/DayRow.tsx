@@ -1,4 +1,4 @@
-import { useState, type CSSProperties } from "react";
+import type { CSSProperties } from "react";
 import type { WorkSession } from "../types/WorkSession";
 import { useSettings } from "../contexts/SettingsContext";
 import { useWeather } from "../contexts/WeatherContext";
@@ -45,27 +45,6 @@ export function DayRow({
   const { settings } = useSettings();
   const { weatherByDate } = useWeather();
   const iso = toISODate(date);
-  // A day with existing entries needs a second click before Paste actually
-  // overwrites them; an empty day has nothing to lose, so it pastes right
-  // away. Reset by hasClipboard too, so a stale "Sure?" can't linger once
-  // there's nothing left to paste.
-  const [confirmingPaste, setConfirmingPaste] = useState(false);
-  const isConfirmingPaste = confirmingPaste && hasClipboard;
-
-  function handlePasteButtonClick() {
-    if (sessions.length > 0 && !isConfirmingPaste) {
-      setConfirmingPaste(true);
-      return;
-    }
-    setConfirmingPaste(false);
-    onPasteClick(iso);
-  }
-
-  const pasteLabel = !hasClipboard
-    ? "Copy a day first"
-    : isConfirmingPaste
-      ? "Click again to overwrite this day's entries"
-      : "Replace this day's entries with the copied ones";
 
   const activeDayCount = workdayCount(settings.workdays);
   const totalMinutes = sumCountedMinutes(sessions, settings.entryTypeCounting);
@@ -129,13 +108,12 @@ export function DayRow({
           </button>
           <button
             type="button"
-            className={`paste-btn${isConfirmingPaste ? " is-confirming" : ""}`}
-            title={pasteLabel}
+            className="paste-btn"
+            title={hasClipboard ? "Replace this day's entries with the copied ones" : "Copy a day first"}
             disabled={!hasClipboard}
-            onClick={handlePasteButtonClick}
-            onBlur={() => setConfirmingPaste(false)}
+            onClick={() => onPasteClick(iso)}
           >
-            {isConfirmingPaste ? "Sure?" : "Paste"}
+            Paste
           </button>
         </div>
       </div>

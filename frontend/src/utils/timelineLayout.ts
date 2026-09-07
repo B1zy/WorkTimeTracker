@@ -28,6 +28,7 @@ export const ENTRY_TYPE_CLASS: Record<EntryType, string | null> = {
   OvertimeCompensation: "type-overtime-compensation",
   Appointment: "type-appointment",
   Lunch: "type-lunch",
+  Vacation: "type-vacation",
 };
 
 export const ENTRY_TYPE_LABEL: Record<EntryType, string> = {
@@ -36,6 +37,7 @@ export const ENTRY_TYPE_LABEL: Record<EntryType, string> = {
   OvertimeCompensation: "Overtime Compensation",
   Appointment: "Appointment",
   Lunch: "Lunch",
+  Vacation: "Vacation",
 };
 
 // Minutes-since-midnight -> left-offset percentage along the visible timebar

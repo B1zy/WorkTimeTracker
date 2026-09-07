@@ -13,7 +13,12 @@ public enum EntryType
     Sick,
     OvertimeCompensation,
     Appointment,
-    Lunch
+    Lunch,
+    // Appended, not inserted -- this is a plain INTEGER column with no CHECK
+    // constraint (see the AddEntryType migration), so a new value here needs
+    // no migration of its own, but existing rows' numeric values must stay
+    // stable.
+    Vacation
 }
 
 public class WorkSession

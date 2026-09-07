@@ -11,7 +11,7 @@ import { ENTRY_TYPE_LABEL } from "../utils/timelineLayout";
 import { TimeField } from "./TimeField";
 import type { EntryType } from "../types/WorkSession";
 
-const ENTRY_TYPES: EntryType[] = ["Working", "Sick", "OvertimeCompensation", "Appointment", "Lunch"];
+const ENTRY_TYPES: EntryType[] = ["Working", "Sick", "OvertimeCompensation", "Appointment", "Lunch", "Vacation"];
 
 // Shortened only for this settings list, where a fixed label column leaves no
 // room for the full name to avoid wrapping -- everywhere else (timeline
@@ -48,6 +48,7 @@ export function SettingsPanel({ onClearAllData, onExportData, onImportData }: Se
   const [clearing, setClearing] = useState(false);
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
+  const [newHoliday, setNewHoliday] = useState("");
 
   function handleTargetHoursChange(event: ChangeEvent<HTMLInputElement>) {
     const hours = Number(event.target.value);
@@ -65,6 +66,28 @@ export function SettingsPanel({ onClearAllData, onExportData, onImportData }: Se
 
   function handleToggleAnimations() {
     updateSettings((prev) => ({ ...prev, animationsEnabled: !prev.animationsEnabled }));
+  }
+
+  function handleToggleTheme() {
+    updateSettings((prev) => ({ ...prev, theme: prev.theme === "light" ? "dark" : "light" }));
+  }
+
+  function handleVacationDaysChange(event: ChangeEvent<HTMLInputElement>) {
+    const days = Number(event.target.value);
+    if (!Number.isFinite(days) || days < 0) return;
+    updateSettings((prev) => ({ ...prev, vacationDaysPerYear: days }));
+  }
+
+  function handleAddHoliday() {
+    if (!newHoliday) return;
+    updateSettings((prev) =>
+      prev.holidays.includes(newHoliday) ? prev : { ...prev, holidays: [...prev.holidays, newHoliday].sort() }
+    );
+    setNewHoliday("");
+  }
+
+  function handleRemoveHoliday(date: string) {
+    updateSettings((prev) => ({ ...prev, holidays: prev.holidays.filter((d) => d !== date) }));
   }
 
   async function handleExport() {
@@ -288,6 +311,80 @@ export function SettingsPanel({ onClearAllData, onExportData, onImportData }: Se
               {settings.animationsEnabled ? "On" : "Off"}
             </button>
           </div>
+
+          <div className="settings-row">
+            <label htmlFor="theme-toggle" className="settings-row-label">
+              Theme
+            </label>
+            <button
+              id="theme-toggle"
+              type="button"
+              className={`settings-toggle-btn${settings.theme === "light" ? " is-on" : ""}`}
+              aria-pressed={settings.theme === "light"}
+              onClick={handleToggleTheme}
+            >
+              {settings.theme === "light" ? "Light" : "Dark"}
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <section className="settings-section" style={{ order: 5 }}>
+        <h3 className="settings-section-title">Time off &amp; holidays</h3>
+        <div className="settings-row-grid">
+          <div className="settings-row">
+            <label htmlFor="vacation-days-input" className="settings-row-label">
+              Vacation days / year
+            </label>
+            <div className="settings-input-with-unit">
+              <input
+                id="vacation-days-input"
+                type="number"
+                min={0}
+                step={0.5}
+                value={settings.vacationDaysPerYear}
+                onChange={handleVacationDaysChange}
+              />
+              <span className="settings-input-unit">days</span>
+            </div>
+          </div>
+
+          <div className="settings-row settings-row-full">
+            <span className="settings-row-label" id="holidays-label">
+              Public holidays
+            </span>
+            <div className="settings-holiday-add" role="group" aria-labelledby="holidays-label">
+              <input
+                type="date"
+                value={newHoliday}
+                onChange={(e) => setNewHoliday(e.target.value)}
+                aria-label="Holiday date"
+              />
+              <button type="button" className="btn-secondary" onClick={handleAddHoliday} disabled={!newHoliday}>
+                Add
+              </button>
+            </div>
+            {settings.holidays.length > 0 && (
+              <ul className="settings-holiday-list">
+                {settings.holidays.map((date) => (
+                  <li key={date} className="settings-holiday-item">
+                    <span>{date}</span>
+                    <button
+                      type="button"
+                      className="settings-holiday-remove"
+                      onClick={() => handleRemoveHoliday(date)}
+                      aria-label={`Remove ${date}`}
+                    >
+                      ×
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+          <p className="settings-hint settings-row-full">
+            An empty day on one of these dates isn't counted as a missed target in your carried-over balance.
+          </p>
         </div>
       </section>
 

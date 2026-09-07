@@ -1,6 +1,6 @@
 export type WorkLocation = "Remote" | "InOffice" | "Other";
 
-export type EntryType = "Working" | "Sick" | "OvertimeCompensation" | "Appointment" | "Lunch";
+export type EntryType = "Working" | "Sick" | "OvertimeCompensation" | "Appointment" | "Lunch" | "Vacation";
 
 // `date` is "YYYY-MM-DD", `start`/`end` are "HH:MM:SS" (matching the
 // backend's DateOnly/TimeOnly serialization).

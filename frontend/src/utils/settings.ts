@@ -17,6 +17,7 @@ export interface SettingsColors {
   typeOvertimeCompensation: string;
   typeAppointment: string;
   typeLunch: string;
+  typeVacation: string;
 }
 
 export interface AppSettings {
@@ -35,6 +36,19 @@ export interface AppSettings {
   // either one turns animations off, since a user might want them off here
   // without changing a system-wide accessibility setting.
   animationsEnabled: boolean;
+  // Light/dark UI palette. Independent of the OS `prefers-color-scheme`
+  // media query -- this is an explicit user choice, not a system follow.
+  theme: "dark" | "light";
+  // Total vacation days allotted for the year -- the denominator for the
+  // "vacation days used" stat (see OverviewView); a Vacation entry's own
+  // duration relative to that day's target is what counts as "used", so a
+  // half-day entry counts as half a day rather than a whole one.
+  vacationDaysPerYear: number;
+  // Dates (ISO "YYYY-MM-DD") the user has marked as a public holiday. An
+  // empty day that falls on one of these doesn't count as a missed-target
+  // deficit in the carryover balance (see useCarryoverMinutes) -- there was
+  // nothing to log, not a shortfall.
+  holidays: string[];
 }
 
 export const DEFAULT_COLORS: SettingsColors = {
@@ -45,11 +59,13 @@ export const DEFAULT_COLORS: SettingsColors = {
   typeOvertimeCompensation: "#8C6A2F",
   typeAppointment: "#B5654F",
   typeLunch: "#C9B38C",
+  typeVacation: "#C9A227",
 };
 
 export const DEFAULT_WEEKLY_TARGET_MINUTES = 42 * 60;
 export const DEFAULT_TIMELINE_START_MIN = 0;
 export const DEFAULT_TIMELINE_END_MIN = 24 * 60;
+export const DEFAULT_VACATION_DAYS_PER_YEAR = 25;
 
 export const DEFAULT_SETTINGS: AppSettings = {
   weeklyTargetMinutes: DEFAULT_WEEKLY_TARGET_MINUTES,
@@ -59,6 +75,9 @@ export const DEFAULT_SETTINGS: AppSettings = {
   entryTypeCounting: DEFAULT_ENTRY_TYPE_COUNTING,
   workdays: DEFAULT_WORKDAYS,
   animationsEnabled: true,
+  theme: "dark",
+  vacationDaysPerYear: DEFAULT_VACATION_DAYS_PER_YEAR,
+  holidays: [],
 };
 
 const STORAGE_KEY = "worktimetracker.settings.v1";
@@ -71,6 +90,7 @@ export const COLOR_CSS_VAR: Record<keyof SettingsColors, string> = {
   typeOvertimeCompensation: "--type-overtime-compensation",
   typeAppointment: "--type-appointment",
   typeLunch: "--type-lunch",
+  typeVacation: "--type-vacation",
 };
 
 export const LOCATION_COLOR_KEYS: (keyof SettingsColors)[] = ["locRemote", "locInoffice", "locOther"];
@@ -79,6 +99,7 @@ export const ENTRY_TYPE_COLOR_KEYS: (keyof SettingsColors)[] = [
   "typeOvertimeCompensation",
   "typeAppointment",
   "typeLunch",
+  "typeVacation",
 ];
 
 export const COLOR_LABEL: Record<keyof SettingsColors, string> = {
@@ -89,6 +110,7 @@ export const COLOR_LABEL: Record<keyof SettingsColors, string> = {
   typeOvertimeCompensation: "Overtime Compensation",
   typeAppointment: "Appointment",
   typeLunch: "Lunch",
+  typeVacation: "Vacation",
 };
 
 // Rebuilds a settings object field-by-field from an untrusted source (a
@@ -113,7 +135,24 @@ export function sanitizeSettings(raw: unknown): AppSettings {
     entryTypeCounting: sanitizeCounting(parsed.entryTypeCounting),
     workdays: sanitizeWorkdays(parsed.workdays),
     animationsEnabled: typeof parsed.animationsEnabled === "boolean" ? parsed.animationsEnabled : true,
+    theme: parsed.theme === "light" ? "light" : "dark",
+    vacationDaysPerYear:
+      isFiniteNumber(parsed.vacationDaysPerYear) && parsed.vacationDaysPerYear >= 0
+        ? parsed.vacationDaysPerYear
+        : DEFAULT_VACATION_DAYS_PER_YEAR,
+    holidays: sanitizeHolidays(parsed.holidays),
   };
+}
+
+const ISO_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+
+function sanitizeHolidays(raw: unknown): string[] {
+  if (!Array.isArray(raw)) return [];
+  const unique = new Set<string>();
+  for (const value of raw) {
+    if (typeof value === "string" && ISO_DATE_PATTERN.test(value)) unique.add(value);
+  }
+  return [...unique].sort();
 }
 
 function sanitizeColors(raw: unknown): SettingsColors {
@@ -154,4 +193,16 @@ export function applyColorOverrides(colors: SettingsColors): void {
 // just feed a value into ones that opted in.
 export function applyMotionPreference(animationsEnabled: boolean): void {
   document.documentElement.classList.toggle("no-animations", !animationsEnabled);
+}
+
+// A `data-theme` attribute (see index.css's `[data-theme="light"]` palette
+// override) rather than a class, matching the convention most CSS theming
+// examples/tools expect -- and unlike a class, its *absence* has no meaning
+// to guard against, since "dark" is simply never written as an attribute.
+export function applyTheme(theme: AppSettings["theme"]): void {
+  if (theme === "light") {
+    document.documentElement.setAttribute("data-theme", "light");
+  } else {
+    document.documentElement.removeAttribute("data-theme");
+  }
 }

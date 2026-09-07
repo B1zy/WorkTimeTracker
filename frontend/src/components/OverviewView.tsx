@@ -19,7 +19,7 @@ import { SettingsSidebar } from "./SettingsSidebar";
 
 // Charted in this fixed order (rather than however each week's sessions
 // happen to sort) so a type's line/legend position stays put week to week.
-const CHART_ENTRY_TYPES: EntryType[] = ["Working", "Sick", "OvertimeCompensation", "Appointment", "Lunch"];
+const CHART_ENTRY_TYPES: EntryType[] = ["Working", "Sick", "OvertimeCompensation", "Appointment", "Lunch", "Vacation"];
 
 // Colors each day by whether it met, missed, or blew past that day's target
 // -- a distinct hue per state (see classifyDayCellState) instead of a
@@ -102,6 +102,7 @@ export function OverviewView({ onClearAllData, onExportData, onImportData, corre
     OvertimeCompensation: settings.colors.typeOvertimeCompensation,
     Appointment: settings.colors.typeAppointment,
     Lunch: settings.colors.typeLunch,
+    Vacation: settings.colors.typeVacation,
   };
 
   const weekTarget = settings.weeklyTargetMinutes;
@@ -111,6 +112,37 @@ export function OverviewView({ onClearAllData, onExportData, onImportData, corre
   // `!== 0` rather than `> 0`: with OvertimeCompensation subtracting, a day can
   // legitimately total negative and still be a day that has entries.
   const trackedDayCount = useMemo(() => Object.values(minutesByDate).filter((m) => m !== 0).length, [minutesByDate]);
+
+  // Raw (un-weighted) OvertimeCompensation duration for the year -- distinct
+  // from the carryover balance, which only sees it as a subtraction against
+  // the target. This is "how much comp time did I actually take", not "how
+  // much did it offset".
+  const compTimeUsedMinutes = useMemo(() => {
+    let sum = 0;
+    for (const week of weeks) {
+      for (const day of week) {
+        if (day.getFullYear() !== year) continue;
+        sum += minutesByDateAndType[toISODate(day)]?.OvertimeCompensation ?? 0;
+      }
+    }
+    return sum;
+  }, [weeks, year, minutesByDateAndType]);
+
+  // Vacation days used: each Vacation session's duration counts as a fraction
+  // of a day relative to that day's target, so a half-day entry counts as 0.5
+  // rather than a whole day off.
+  const vacationDaysUsed = useMemo(() => {
+    if (dayTarget <= 0) return 0;
+    let sum = 0;
+    for (const week of weeks) {
+      for (const day of week) {
+        if (day.getFullYear() !== year) continue;
+        const minutes = minutesByDateAndType[toISODate(day)]?.Vacation;
+        if (minutes) sum += minutes / dayTarget;
+      }
+    }
+    return sum;
+  }, [weeks, year, minutesByDateAndType, dayTarget]);
 
   // Per-week totals, oldest first -- the basis for both the "weeks with
   // entries" average and the running carryover balance below.
@@ -147,13 +179,21 @@ export function OverviewView({ onClearAllData, onExportData, onImportData, corre
     }
     if (firstTrackedIndex === -1) return 0;
 
+    // A holiday on an active workday isn't a missed target -- there was
+    // nothing to log -- so it shrinks that week's effective target by one
+    // day's worth (every day in `weeks[i]` is already an active workday --
+    // see workdayOffsets -- so no further weekday filtering is needed here).
+    const holidaySet = new Set(settings.holidays);
+
     let sum = 0;
     for (let i = firstTrackedIndex; i < priorCount; i++) {
       const correction = corrections[toISODate(weeks[i][0])] ?? 0;
-      sum += weekTotals[i] + correction - weekTarget;
+      const holidayCount = weeks[i].filter((day) => holidaySet.has(toISODate(day))).length;
+      const effectiveTarget = weekTarget - holidayCount * dayTarget;
+      sum += weekTotals[i] + correction - effectiveTarget;
     }
     return sum;
-  }, [weekTotals, weeks, weekTarget, currentWeekIndex, corrections]);
+  }, [weekTotals, weeks, weekTarget, dayTarget, currentWeekIndex, corrections, settings.holidays]);
 
   // One label per column where the month changes, matching GitHub's
   // month-header style above the grid. The year's first/last weeks can spill
@@ -323,6 +363,16 @@ export function OverviewView({ onClearAllData, onExportData, onImportData, corre
               {formatSignedDuration(carryoverMinutes)}
             </div>
             <div className="overview-stat-label">Carried over from previous weeks</div>
+          </div>
+          <div className="overview-stat">
+            <div className="overview-stat-value">{formatDuration(compTimeUsedMinutes)}</div>
+            <div className="overview-stat-label">Comp time used in {year}</div>
+          </div>
+          <div className="overview-stat">
+            <div className="overview-stat-value">
+              {vacationDaysUsed.toFixed(1)} / {settings.vacationDaysPerYear}
+            </div>
+            <div className="overview-stat-label">Vacation days used</div>
           </div>
         </div>
 
